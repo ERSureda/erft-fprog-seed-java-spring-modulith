@@ -7,5 +7,5 @@ build/
 .gitignore
 .standards/
 adr/
-standards/
+.standards/
 README.md

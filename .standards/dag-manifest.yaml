@@ -1,0 +1,294 @@
+# ==============================================================================
+# FProg Standards — Grafo Dirigido Acíclico de Construcción Autónoma (DAG)
+# Preset: java-spring-modulith (v1.0.0)
+# ==============================================================================
+version: "1.0.0"
+preset_id: "java-spring-modulith"
+description: >-
+  Grafo declarativo determinista de tareas de construcción para subagentes efímeros
+  de Fase 2 (Standards). Ejecuta primero los módulos en paralelo (cero dependencias
+  físicas entre esquemas) y luego las integraciones inter-módulo en orden topológico.
+
+governance:
+  quality_gate_entry: "Gate 3.3 (Spec Lock en docs/)"
+  quality_gate_exit: "Gate 4 (./gradlew check en verde en < 5 min)"
+  abort_on_ambiguity: true
+  blast_radius_rule: "Blast Radius = 0"
+
+# ------------------------------------------------------------------------------
+# Niveles de Modelo (Model Tiers) para Enrutamiento Agéntico
+# ------------------------------------------------------------------------------
+tiers:
+  tier_1:
+    profile: "Rápido / Determinista (Traducción 1:1, DDL, Vocabularios)"
+    default_temperature: 0.0
+  tier_2:
+    profile: "Balanceado / Estructural (Adaptadores Web, Slices, Tests de Integración)"
+    default_temperature: 0.1
+  tier_3:
+    profile: "Alto Razonamiento / Rescate (Lógica pura de Agregado, Orquestación, Invariantes)"
+    default_temperature: 0.2
+
+# ------------------------------------------------------------------------------
+# Etapas del Grafo de Construcción (Execution Pipeline)
+# ------------------------------------------------------------------------------
+pipeline:
+  # ----------------------------------------------------------------------------
+  # Etapa 0: Verificación de Precondiciones y Semilla Base
+  # ----------------------------------------------------------------------------
+  - stage: 0
+    id: "stage-0-baseline-verification"
+    name: "Verificación de Semilla e Infraestructura Compartida"
+    parallel: false
+    tasks:
+      - task_id: "verify-seed-and-shared-kernel"
+        tier: "tier_1"
+        inputs:
+          - ".standards/ARCHITECTURE.md"
+          - "docs/02-TECH_STACK.md"
+        validation:
+          command: './gradlew test --tests "*ModulithStructureTest*" --tests "*DomainRulesArchTest*"'
+
+  # ----------------------------------------------------------------------------
+  # Etapa 1: Andamiaje Modular y Migraciones Flyway DDL (Paralelo por Módulo)
+  # ----------------------------------------------------------------------------
+  - stage: 1
+    id: "stage-1-module-scaffolding-and-ddl"
+    name: "Andamiaje Modular Hexagonal y Generación de Scripts Flyway DDL"
+    parallel: true
+    for_each: "module_id in docs/03-SUBDOMAINS.md"
+    tasks:
+      - task_id: "generate-module-structure"
+        skill: ".standards/skills/build/generate-module-structure.md"
+        tier: "tier_1"
+        inputs:
+          - "docs/02-TECH_STACK.md"
+          - "docs/03-SUBDOMAINS.md"
+          - "docs/modules/${module_id}/DOMAIN.md"
+          - "docs/modules/${module_id}/API.md"
+          - ".standards/ARCHITECTURE.md"
+          - ".standards/EXCEPTIONS.md"
+        outputs:
+          - "src/main/java/${base_package}/${module_id}/package-info.java"
+          - "src/main/java/${base_package}/${module_id}/application/package-info.java"
+          - "src/main/java/${base_package}/${module_id}/domain/${Modulo}Error.java"
+          - "src/test/java/${base_package}/${module_id}/"
+        validation:
+          command: './gradlew compileJava compileTestJava && ./gradlew test --tests "*ModulithStructureTest*" --tests "*DomainRulesArchTest*"'
+
+      - task_id: "generate-db-migration"
+        skill: ".standards/skills/build/generate-db-migration.md"
+        tier: "tier_1"
+        inputs:
+          - "docs/modules/${module_id}/schema.sql"
+          - "src/main/resources/db/migration/V1__init_shared_infrastructure.sql"
+          - ".standards/ARCHITECTURE.md"
+        outputs:
+          - "src/main/resources/db/migration/V${next_version}__init_${module_id}_tables.sql"
+        validation:
+          command: './gradlew compileJava compileTestJava && ./gradlew test --tests "*Migration*" --tests "*PersistenceRulesArchTest*"'
+
+  # ----------------------------------------------------------------------------
+  # Etapa 2: Modelo de Dominio Puro (Paralelo por Módulo)
+  # ----------------------------------------------------------------------------
+  - stage: 2
+    id: "stage-2-domain-core"
+    name: "Construcción del Núcleo de Dominio Puro (100% Java 21)"
+    parallel: true
+    for_each: "module_id in docs/03-SUBDOMAINS.md"
+    tasks:
+      - task_id: "generate-domain-enums"
+        skill: ".standards/skills/build/generate-domain-enums.md"
+        tier: "tier_1"
+        depends_on: ["generate-module-structure", "generate-db-migration"]
+        inputs:
+          - "docs/02-TECH_STACK.md"
+          - "docs/modules/${module_id}/DOMAIN.md"
+          - "src/main/resources/db/migration/V${next_version}__init_${module_id}_tables.sql"
+          - ".standards/ARCHITECTURE.md"
+        outputs:
+          - "src/main/java/${base_package}/${module_id}/domain/model/enums/"
+        validation:
+          command: './gradlew compileJava compileTestJava && ./gradlew test --tests "*DomainRulesArchTest*" --tests "*ModulithStructureTest*"'
+
+      - task_id: "generate-domain-models"
+        skill: ".standards/skills/build/generate-domain-models.md"
+        tier: "tier_2"
+        depends_on: ["generate-module-structure", "generate-db-migration", "generate-domain-enums"]
+        inputs:
+          - "docs/02-TECH_STACK.md"
+          - "docs/modules/${module_id}/DOMAIN.md"
+          - "src/main/resources/db/migration/V${next_version}__init_${module_id}_tables.sql"
+          - "src/main/java/${base_package}/${module_id}/domain/model/enums/"
+          - ".standards/ARCHITECTURE.md"
+        outputs:
+          - "src/main/java/${base_package}/${module_id}/domain/model/"
+        validation:
+          command: './gradlew compileJava compileTestJava && ./gradlew test --tests "*DomainRulesArchTest*" --tests "*ModulithStructureTest*"'
+
+  # ----------------------------------------------------------------------------
+  # Etapa 3: Contratos de Aplicación y Puertos (Paralelo por Módulo)
+  # ----------------------------------------------------------------------------
+  - stage: 3
+    id: "stage-3-application-contracts"
+    name: "Contratos de Aplicación, Casos de Uso y Puertos (API Pública del Módulo)"
+    parallel: true
+    for_each: "module_id in docs/03-SUBDOMAINS.md"
+    tasks:
+      - task_id: "generate-application-commands"
+        skill: ".standards/skills/build/generate-application-commands.md"
+        tier: "tier_1"
+        depends_on: ["generate-module-structure", "generate-domain-enums"]
+        inputs:
+          - "docs/02-TECH_STACK.md"
+          - "docs/modules/${module_id}/API.md"
+          - "src/main/java/${base_package}/${module_id}/domain/model/enums/"
+          - ".standards/ARCHITECTURE.md"
+        outputs:
+          - "src/main/java/${base_package}/${module_id}/application/command/"
+        validation:
+          command: './gradlew compileJava compileTestJava && ./gradlew test --tests "*ModulithStructureTest*" --tests "*ApplicationRulesArchTest*"'
+
+      - task_id: "generate-application-queries"
+        skill: ".standards/skills/build/generate-application-queries.md"
+        tier: "tier_1"
+        depends_on: ["generate-module-structure", "generate-domain-enums"]
+        inputs:
+          - "docs/02-TECH_STACK.md"
+          - "docs/modules/${module_id}/API.md"
+          - "src/main/java/${base_package}/${module_id}/domain/model/enums/"
+          - ".standards/ARCHITECTURE.md"
+        outputs:
+          - "src/main/java/${base_package}/${module_id}/application/query/"
+        validation:
+          command: './gradlew compileJava compileTestJava && ./gradlew test --tests "*ModulithStructureTest*" --tests "*ApplicationRulesArchTest*"'
+
+      - task_id: "generate-application-results"
+        skill: ".standards/skills/build/generate-application-results.md"
+        tier: "tier_1"
+        depends_on: ["generate-module-structure", "generate-domain-enums"]
+        inputs:
+          - "docs/02-TECH_STACK.md"
+          - "docs/modules/${module_id}/API.md"
+          - "src/main/java/${base_package}/${module_id}/domain/model/enums/"
+          - ".standards/ARCHITECTURE.md"
+        outputs:
+          - "src/main/java/${base_package}/${module_id}/application/result/"
+        validation:
+          command: './gradlew compileJava compileTestJava && ./gradlew test --tests "*ModulithStructureTest*" --tests "*ApplicationRulesArchTest*"'
+
+      - task_id: "generate-application-use-cases"
+        skill: ".standards/skills/build/generate-application-use-cases.md"
+        tier: "tier_2"
+        depends_on: ["generate-application-commands", "generate-application-queries", "generate-application-results"]
+        inputs:
+          - "docs/02-TECH_STACK.md"
+          - "docs/modules/${module_id}/API.md"
+          - "src/main/java/${base_package}/${module_id}/application/command/"
+          - "src/main/java/${base_package}/${module_id}/application/query/"
+          - "src/main/java/${base_package}/${module_id}/application/result/"
+          - ".standards/ARCHITECTURE.md"
+        outputs:
+          - "src/main/java/${base_package}/${module_id}/application/port/in/"
+        validation:
+          command: './gradlew compileJava compileTestJava && ./gradlew test --tests "*ModulithStructureTest*" --tests "*ApplicationRulesArchTest*"'
+
+      - task_id: "generate-application-output-ports"
+        skill: ".standards/skills/build/generate-application-output-ports.md"
+        tier: "tier_2"
+        depends_on: ["generate-domain-models", "generate-application-queries", "generate-application-results", "generate-application-use-cases"]
+        inputs:
+          - "docs/02-TECH_STACK.md"
+          - "docs/modules/${module_id}/DOMAIN.md"
+          - "docs/modules/${module_id}/schema.sql"
+          - "docs/modules/${module_id}/API.md"
+          - "src/main/java/${base_package}/${module_id}/domain/model/"
+          - "src/main/java/${base_package}/${module_id}/application/query/"
+          - "src/main/java/${base_package}/${module_id}/application/result/"
+          - "src/main/java/${base_package}/${module_id}/application/port/in/"
+          - ".standards/ARCHITECTURE.md"
+        outputs:
+          - "src/main/java/${base_package}/${module_id}/application/port/out/"
+        validation:
+          command: './gradlew compileJava compileTestJava && ./gradlew test --tests "*ModulithStructureTest*" --tests "*ApplicationRulesArchTest*"'
+
+  # ----------------------------------------------------------------------------
+  # Etapa 4: Adaptadores de Entrada y Salida (Paralelo por Módulo)
+  # ----------------------------------------------------------------------------
+  - stage: 4
+    id: "stage-4-adapters"
+    name: "Implementación de Adaptadores Hexagonales (Entidades JPA, DTOs Web y Controladores REST)"
+    parallel: true
+    for_each: "module_id in docs/03-SUBDOMAINS.md"
+    tasks:
+      - task_id: "generate-jpa-entities"
+        skill: ".standards/skills/build/generate-jpa-entities.md"
+        tier: "tier_1"
+        depends_on: ["generate-module-structure", "generate-db-migration"]
+        inputs:
+          - "docs/02-TECH_STACK.md"
+          - "src/main/resources/db/migration/V${next_version}__init_${module_id}_tables.sql"
+          - ".standards/ARCHITECTURE.md"
+        outputs:
+          - "src/main/java/${base_package}/${module_id}/infrastructure/adapter/out/persistence/postgres/jpa/entity/"
+        validation:
+          command: './gradlew compileJava compileTestJava && ./gradlew test --tests "*PersistenceRulesArchTest*" --tests "*ModulithStructureTest*"'
+
+      - task_id: "generate-web-http-requests"
+        skill: ".standards/skills/build/generate-web-http-requests.md"
+        tier: "tier_2"
+        depends_on: ["generate-application-commands", "generate-domain-enums"]
+        inputs:
+          - "docs/02-TECH_STACK.md"
+          - "docs/modules/${module_id}/API.md"
+          - "docs/modules/${module_id}/schema.sql"
+          - "src/main/resources/db/migration/V1__init_shared_infrastructure.sql"
+          - "src/main/java/${base_package}/${module_id}/application/command/"
+          - "src/main/java/${base_package}/${module_id}/domain/model/enums/"
+          - ".standards/ARCHITECTURE.md"
+        outputs:
+          - "src/main/java/${base_package}/${module_id}/infrastructure/adapter/in/web/dto/"
+        validation:
+          command: './gradlew compileJava compileTestJava && ./gradlew test --tests "*WebRulesArchTest*" --tests "*ModulithStructureTest*"'
+
+      - task_id: "generate-web-controllers"
+        skill: ".standards/skills/build/generate-web-controllers.md"
+        tier: "tier_2"
+        depends_on: ["generate-application-use-cases", "generate-application-commands", "generate-application-queries", "generate-application-results", "generate-web-http-requests", "generate-domain-enums"]
+        inputs:
+          - "docs/02-TECH_STACK.md"
+          - "docs/modules/${module_id}/API.md"
+          - "src/main/java/${base_package}/${module_id}/application/port/in/"
+          - "src/main/java/${base_package}/${module_id}/application/command/"
+          - "src/main/java/${base_package}/${module_id}/application/query/"
+          - "src/main/java/${base_package}/${module_id}/application/result/"
+          - "src/main/java/${base_package}/${module_id}/domain/model/enums/"
+          - "src/main/java/${base_package}/${module_id}/infrastructure/adapter/in/web/dto/"
+          - ".standards/ARCHITECTURE.md"
+          - ".standards/EXCEPTIONS.md"
+        outputs:
+          - "src/main/java/${base_package}/${module_id}/infrastructure/adapter/in/web/"
+        validation:
+          command: './gradlew compileJava compileTestJava && ./gradlew test --tests "*WebRulesArchTest*" --tests "*ModulithStructureTest*"'
+
+  # ----------------------------------------------------------------------------
+  # Etapa 5: Verificación Global y Quality Gate 4
+  # ----------------------------------------------------------------------------
+  - stage: 5
+    id: "stage-5-final-gate-4"
+    name: "Auditoría Completa de Arquitectura y Suite de Pruebas (Gate 4)"
+    parallel: false
+    tasks:
+      - task_id: "execute-gate-4-verification"
+        tier: "tier_3"
+        inputs:
+          - ".standards/TESTING.md"
+        validation:
+          command: "./gradlew check"
+          max_duration_seconds: 300
+          required_checks:
+            - "Spring Modulith modular boundary verification passed"
+            - "ArchUnit fitness functions passed (0 violations)"
+            - "PostgreSQL 17 Testcontainers suite passed"
+            - "Tenant Leakage test passed"
+            - "Compilation 100% clean"
