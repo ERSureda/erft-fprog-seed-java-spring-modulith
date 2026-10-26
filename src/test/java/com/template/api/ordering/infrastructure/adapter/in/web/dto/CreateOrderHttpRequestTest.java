@@ -8,17 +8,12 @@ import java.math.BigDecimal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/**
- * Test suite for {@link CreateOrderHttpRequest}.
- * <p>
- * Verifies direct conversion from web request DTO to application command with zero overhead.
- */
 @DisplayName("CreateOrderHttpRequest Unit Tests")
 class CreateOrderHttpRequestTest {
 
     @Test
     @DisplayName("toCommand should map all fields directly into CreateOrderCommand with zero overhead")
-    void toCommand_shouldMapFieldsDirectly() {
+    void should_map_fields_directly_when_to_command_invoked() {
         BigDecimal amount = new BigDecimal("149.99");
         String currency = "EUR";
         CreateOrderHttpRequest request = new CreateOrderHttpRequest(amount, currency);

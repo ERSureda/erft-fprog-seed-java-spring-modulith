@@ -12,18 +12,12 @@ import java.time.ZoneOffset;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/**
- * Unit tests for {@link UtcClockAdapter}.
- * <p>
- * Verifies production of UTC timestamps, adherence to {@link UtcClockPort}, fallback to system UTC clock,
- * and deterministic time handling when initialized with fixed clocks.
- */
 @DisplayName("UtcClockAdapter Unit Tests")
 class UtcClockAdapterTest {
 
     @Test
     @DisplayName("Should implement UtcClockPort and default to system UTC when clock is null")
-    void nullClock_shouldDefaultToSystemUtc() {
+    void should_default_to_system_utc_when_clock_is_null() {
         UtcClockAdapter clockAdapter = new UtcClockAdapter(null);
 
         assertThat(clockAdapter).isInstanceOf(UtcClockPort.class);
@@ -38,7 +32,7 @@ class UtcClockAdapterTest {
 
     @Test
     @DisplayName("Should return fixed instant when configured with fixed clock")
-    void customConstructor_withFixedClock_shouldReturnFixedInstant() {
+    void should_return_fixed_instant_when_configured_with_fixed_clock() {
         Instant fixedInstant = Instant.parse("2026-09-12T10:15:30.00Z");
         Clock fixedClock = Clock.fixed(fixedInstant, ZoneOffset.UTC);
         UtcClockAdapter clockAdapter = new UtcClockAdapter(fixedClock);
@@ -50,7 +44,7 @@ class UtcClockAdapterTest {
 
     @Test
     @DisplayName("Should correctly calculate todayUtc via default method")
-    void todayUtc_shouldReturnCurrentDateInUtc() {
+    void should_return_current_date_in_utc_when_today_utc_invoked() {
         Instant fixedInstant = Instant.parse("2026-09-12T23:59:59.00Z");
         Clock fixedClock = Clock.fixed(fixedInstant, ZoneOffset.UTC);
         UtcClockAdapter clockAdapter = new UtcClockAdapter(fixedClock);

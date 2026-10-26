@@ -6,19 +6,6 @@ import com.template.api.shared.domain.exception.UnauthenticatedException;
 import java.util.Set;
 import java.util.UUID;
 
-/**
- * Immutable execution context carrying identity, multitenancy, authorization, and tracing metadata.
- * <p>
- * Decoupled from transport protocols (HTTP headers, tokens, message queues), this record provides
- * application use cases with an authenticated snapshot of the calling actor.
- * Conforms to SED-03.
- *
- * @param userType      classification of the calling actor
- * @param tenantId      target tenant identifier, or null for global admins or tenantless requests
- * @param userId        authenticated user identifier, or null for anonymous executions
- * @param roles         immutable set of functional roles granted within the actor scope
- * @param correlationId end-to-end distributed tracing correlation identifier
- */
 public record ExecutionContext(
         UserType userType,
         UUID tenantId,

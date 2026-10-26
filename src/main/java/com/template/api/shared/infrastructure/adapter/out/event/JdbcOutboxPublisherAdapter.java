@@ -14,25 +14,9 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 import java.util.UUID;
 
-/**
- * Secondary outbound persistence adapter implementing {@link OutboxPublisherPort} using Spring JDBC and JSONB.
- * <p>
- * Inserts domain events atomically into the {@code outbox_events} table using sequential UUIDv7 identifiers.
- * Conforms to TRX-03, SED-05, and OUT-05.
- */
 @Component
 @RequiredArgsConstructor
 public class JdbcOutboxPublisherAdapter implements OutboxPublisherPort {
-
-    private static final String OUTBOX_INSERT_SQL = """
-        INSERT INTO outbox_events (
-            event_id, tenant_id, aggregate_type, aggregate_id,
-            event_type, payload, correlation_id, status
-        ) VALUES (
-            :eventId, :tenantId, :aggType, :aggId,
-            :eventType, CAST(:payload AS jsonb), :corrId, 'PENDING'
-        )
-    """;
 
     private final NamedParameterJdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper;
@@ -43,7 +27,7 @@ public class JdbcOutboxPublisherAdapter implements OutboxPublisherPort {
         if (event == null) {
             return;
         }
-        publishAll(List.of(event));
+        publish(null, resolveAggregateType(event), resolveAggregateId(event), event);
     }
 
     @Override
@@ -51,34 +35,59 @@ public class JdbcOutboxPublisherAdapter implements OutboxPublisherPort {
         if (events == null || events.isEmpty()) {
             return;
         }
-
         for (DomainEvent event : events) {
-            if (event == null) {
-                continue;
-            }
-            try {
-                String payload = objectMapper.writeValueAsString(event);
-                String correlationId = ExecutionContextHolder.get() != null
-                        ? ExecutionContextHolder.get().correlationId()
-                        : null;
-                UUID tenantId = ExecutionContextHolder.getTenantId();
-
-                String aggregateType = resolveAggregateType(event);
-
-                MapSqlParameterSource params = new MapSqlParameterSource()
-                        .addValue("eventId", uuidGenerator.generateId())
-                        .addValue("tenantId", tenantId)
-                        .addValue("aggType", aggregateType)
-                        .addValue("aggId", event.aggregateId())
-                        .addValue("eventType", event.eventType())
-                        .addValue("payload", payload)
-                        .addValue("corrId", correlationId);
-
-                jdbcTemplate.update(OUTBOX_INSERT_SQL, params);
-            } catch (Exception ex) {
-                throw new InfrastructureException("Failed to persist domain event to outbox", ex);
+            if (event != null) {
+                publish(null, resolveAggregateType(event), resolveAggregateId(event), event);
             }
         }
+    }
+
+    @Override
+    public void publish(String moduleSchema, String aggregateType, UUID aggregateId, DomainEvent event) {
+        if (event == null) {
+            return;
+        }
+        try {
+            String payload = objectMapper.writeValueAsString(event);
+            String correlationId = ExecutionContextHolder.get() != null
+                    ? ExecutionContextHolder.get().correlationId()
+                    : null;
+            UUID tenantId = ExecutionContextHolder.getTenantId();
+
+            String table = resolveTable(moduleSchema);
+
+            String sql = """
+                INSERT INTO %s (
+                    event_id, tenant_id, aggregate_type, aggregate_id,
+                    event_type, payload, correlation_id, status
+                ) VALUES (
+                    :eventId, :tenantId, :aggType, :aggId,
+                    :eventType, CAST(:payload AS jsonb), :corrId, 'PENDING'
+                )
+            """.formatted(table);
+
+            String resolvedAggId = aggregateId != null ? aggregateId.toString() : event.aggregateId();
+
+            MapSqlParameterSource params = new MapSqlParameterSource()
+                    .addValue("eventId", uuidGenerator.generateId())
+                    .addValue("tenantId", tenantId)
+                    .addValue("aggType", aggregateType != null ? aggregateType : resolveAggregateType(event))
+                    .addValue("aggId", resolvedAggId)
+                    .addValue("eventType", event.eventType())
+                    .addValue("payload", payload)
+                    .addValue("corrId", correlationId);
+
+            jdbcTemplate.update(sql, params);
+        } catch (Exception ex) {
+            throw new InfrastructureException("Failed to persist domain event to outbox", ex);
+        }
+    }
+
+    private String resolveTable(String moduleSchema) {
+        if (moduleSchema == null || moduleSchema.isBlank() || "default".equalsIgnoreCase(moduleSchema.trim())) {
+            return "outbox_events";
+        }
+        return moduleSchema.trim() + ".outbox_events";
     }
 
     private String resolveAggregateType(DomainEvent event) {
@@ -87,5 +96,16 @@ public class JdbcOutboxPublisherAdapter implements OutboxPublisherPort {
             simpleName = simpleName.substring(0, simpleName.length() - 5);
         }
         return simpleName.isEmpty() ? "Unknown" : simpleName;
+    }
+
+    private UUID resolveAggregateId(DomainEvent event) {
+        if (event == null || event.aggregateId() == null) {
+            return null;
+        }
+        try {
+            return UUID.fromString(event.aggregateId());
+        } catch (IllegalArgumentException ex) {
+            return null;
+        }
     }
 }

@@ -2,19 +2,9 @@ package com.template.api.shared.domain.model;
 
 import java.util.Objects;
 
-/**
- * Base abstract class for domain entities in Domain-Driven Design (DDD).
- * <p>
- * Encapsulates persistent identity and guarantees identity-based equality independent of mutable state.
- * Conforms to DOM-01 and DOM-02.
- *
- * @param <ID> unique identifier type of the entity
- */
 public abstract class BaseEntity<ID> {
 
-    protected ID id;
-
-    protected BaseEntity() {}
+    protected final ID id;
 
     protected BaseEntity(ID id) {
         this.id = Objects.requireNonNull(id, "ENTITY_ID_CANNOT_BE_NULL");

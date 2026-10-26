@@ -8,12 +8,6 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.UUID;
 
-/**
- * Spring JDBC RowMapper projecting SQL query rows directly into immutable {@link OrderResult} DTOs.
- * <p>
- * Eliminates intermediate entity conversion steps for CQRS query operations.
- * Conforms to OUT-04 and OUT-05.
- */
 @Component
 public class OrderResultRowMapper implements RowMapper<OrderResult> {
 

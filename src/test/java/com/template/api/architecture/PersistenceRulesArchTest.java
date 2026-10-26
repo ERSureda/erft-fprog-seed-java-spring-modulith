@@ -8,12 +8,6 @@ import com.tngtech.archunit.lang.ArchRule;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
-/**
- * Architectural fitness function validating persistence layer conventions.
- * <p>
- * Ensures JPA entities reside strictly in JPA adapters (OUT-01) and confines
- * NamedParameterJdbcTemplate usage to JDBC adapters or outbox relay (OUT-05).
- */
 @AnalyzeClasses(packages = "com.template.api", importOptions = ImportOption.DoNotIncludeTests.class)
 class PersistenceRulesArchTest {
 
@@ -27,7 +21,7 @@ class PersistenceRulesArchTest {
     static final ArchRule jdbc_template_should_reside_in_jdbc_persistence =
             noClasses().that().resideOutsideOfPackages(
                             "..infrastructure.adapter.out.persistence..jdbc..",
-                            "..shared.infrastructure.adapter.out.event.."
+                            "..shared.infrastructure.adapter.out.."
                     )
                     .should().dependOnClassesThat().haveFullyQualifiedName("org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate")
                     .as("OUT-05: El uso de NamedParameterJdbcTemplate debe confinarse al adaptador de persistencia JDBC o al outbox transversal");

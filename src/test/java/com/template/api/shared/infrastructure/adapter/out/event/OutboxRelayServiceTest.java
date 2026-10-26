@@ -26,12 +26,6 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-/**
- * Unit tests for {@link OutboxRelayService}.
- * <p>
- * Verifies polling of pending transactional outbox events, status transitions (PROCESSING -> DELIVERED),
- * publication via {@link EventPublisherPort}, deserialization error handling, and scheduled purging.
- */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("OutboxRelayService Unit Tests")
 class OutboxRelayServiceTest {
@@ -55,7 +49,7 @@ class OutboxRelayServiceTest {
 
     @Test
     @DisplayName("Should do nothing when no pending outbox events exist")
-    void processPendingEvents_emptyQueue() {
+    void should_do_nothing_when_no_pending_outbox_events_exist() {
         when(jdbcTemplate.queryForList(anyString(), anyMap())).thenReturn(List.of());
 
         service.processPendingEvents();
@@ -65,7 +59,7 @@ class OutboxRelayServiceTest {
 
     @Test
     @DisplayName("Should transition to PROCESSING, publish domain event, and transition to DELIVERED")
-    void processPendingEvents_success() throws Exception {
+    void should_transition_status_and_publish_event_when_pending_events_exist() throws Exception {
         UUID eventId = UUID.randomUUID();
         TestOutboxEvent event = new TestOutboxEvent("agg-1");
         String payloadJson = objectMapper.writeValueAsString(event);
@@ -91,12 +85,14 @@ class OutboxRelayServiceTest {
     }
 
     @Test
-    @DisplayName("Should execute scheduled purge of delivered events older than retention days")
-    void purgeDeliveredEvents_shouldExecuteDelete() {
+    @DisplayName("Should execute scheduled purge of delivered outbox events and processed idempotency events")
+    void should_execute_delete_when_purging_delivered_events() {
         when(jdbcTemplate.update(contains("DELETE FROM outbox_events"), anyMap())).thenReturn(5);
+        when(jdbcTemplate.update(contains("DELETE FROM processed_events"), anyMap())).thenReturn(3);
 
         service.purgeDeliveredEvents();
 
         verify(jdbcTemplate).update(contains("DELETE FROM outbox_events"), eq(Map.of("days", 7)));
+        verify(jdbcTemplate).update(contains("DELETE FROM processed_events"), eq(Map.of("days", 7)));
     }
 }

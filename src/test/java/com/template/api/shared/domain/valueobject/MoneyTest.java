@@ -11,11 +11,6 @@ import java.util.Currency;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/**
- * Test suite for {@link Money} Value Object.
- * <p>
- * Verifies arithmetic operations, currency compatibility, scale-independent equality, and validation invariants.
- */
 @DisplayName("Money Value Object Unit Tests")
 class MoneyTest {
 
@@ -28,7 +23,7 @@ class MoneyTest {
 
         @Test
         @DisplayName("Should create Money successfully with valid amount and currency")
-        void shouldCreateMoneySuccessfully() {
+        void should_create_money_when_amount_and_currency_valid() {
             Money money = Money.of(new BigDecimal("100.50"), EUR);
 
             assertThat(money.amount()).isEqualByComparingTo("100.50");
@@ -37,7 +32,7 @@ class MoneyTest {
 
         @Test
         @DisplayName("Should create Money via string factories")
-        void shouldCreateMoneyViaStringFactories() {
+        void should_create_money_when_string_factories_invoked() {
             Money m1 = Money.of(new BigDecimal("50.00"), "EUR");
             Money m2 = Money.of("50.00", "EUR");
             Money zero = Money.zero("EUR");
@@ -49,7 +44,7 @@ class MoneyTest {
 
         @Test
         @DisplayName("Should reject null amount")
-        void shouldRejectNullAmount() {
+        void should_throw_exception_when_amount_is_null() {
             assertThatThrownBy(() -> new Money(null, EUR))
                     .isInstanceOf(NullPointerException.class)
                     .hasMessageContaining("MONEY_AMOUNT_CANNOT_BE_NULL");
@@ -57,7 +52,7 @@ class MoneyTest {
 
         @Test
         @DisplayName("Should reject null currency")
-        void shouldRejectNullCurrency() {
+        void should_throw_exception_when_currency_is_null() {
             assertThatThrownBy(() -> new Money(BigDecimal.TEN, null))
                     .isInstanceOf(NullPointerException.class)
                     .hasMessageContaining("MONEY_CURRENCY_CANNOT_BE_NULL");
@@ -65,7 +60,7 @@ class MoneyTest {
 
         @Test
         @DisplayName("Should reject negative amount in constructor")
-        void shouldRejectNegativeAmount() {
+        void should_throw_exception_when_amount_is_negative() {
             assertThatThrownBy(() -> new Money(new BigDecimal("-1.00"), EUR))
                     .isInstanceOf(ValidationException.class)
                     .hasMessageContaining("MONEY_AMOUNT_CANNOT_BE_NEGATIVE");
@@ -78,7 +73,7 @@ class MoneyTest {
 
         @Test
         @DisplayName("Should add money with same currency")
-        void shouldAddMoneyWithSameCurrency() {
+        void should_add_money_when_same_currency() {
             Money m1 = Money.of(new BigDecimal("10.50"), EUR);
             Money m2 = Money.of(new BigDecimal("20.25"), EUR);
 
@@ -90,7 +85,7 @@ class MoneyTest {
 
         @Test
         @DisplayName("Should fail adding money with different currency")
-        void shouldFailAddingDifferentCurrency() {
+        void should_fail_adding_when_currencies_differ() {
             Money m1 = Money.of(new BigDecimal("10.00"), EUR);
             Money m2 = Money.of(new BigDecimal("10.00"), USD);
 
@@ -101,7 +96,7 @@ class MoneyTest {
 
         @Test
         @DisplayName("Should subtract money with same currency")
-        void shouldSubtractMoneyWithSameCurrency() {
+        void should_subtract_money_when_same_currency() {
             Money m1 = Money.of(new BigDecimal("30.00"), EUR);
             Money m2 = Money.of(new BigDecimal("12.50"), EUR);
 
@@ -112,7 +107,7 @@ class MoneyTest {
 
         @Test
         @DisplayName("Should fail subtracting when result is negative")
-        void shouldFailSubtractingResultingInNegative() {
+        void should_fail_subtracting_when_result_would_be_negative() {
             Money m1 = Money.of(new BigDecimal("10.00"), EUR);
             Money m2 = Money.of(new BigDecimal("20.00"), EUR);
 
@@ -123,7 +118,7 @@ class MoneyTest {
 
         @Test
         @DisplayName("Should multiply money by decimal and long factor")
-        void shouldMultiplyMoneyByFactor() {
+        void should_multiply_money_when_factor_provided() {
             Money m = Money.of(new BigDecimal("15.00"), EUR);
 
             Money res1 = m.multiply(new BigDecimal("2.5"));
@@ -140,7 +135,7 @@ class MoneyTest {
 
         @Test
         @DisplayName("Should test isZero and isPositive correctly")
-        void shouldTestPredicates() {
+        void should_evaluate_predicates_when_zero_or_positive() {
             Money zero = Money.zero(EUR);
             Money pos = Money.of(new BigDecimal("0.01"), EUR);
 
@@ -153,7 +148,7 @@ class MoneyTest {
 
         @Test
         @DisplayName("Should compare money amounts with same currency")
-        void shouldCompareMoneyAmounts() {
+        void should_compare_amounts_when_same_currency() {
             Money m10 = Money.of(new BigDecimal("10.00"), EUR);
             Money m20 = Money.of(new BigDecimal("20.00"), EUR);
 
@@ -166,7 +161,7 @@ class MoneyTest {
 
         @Test
         @DisplayName("Should fail comparison with different currencies")
-        void shouldFailComparisonDifferentCurrencies() {
+        void should_fail_comparison_when_currencies_differ() {
             Money eur = Money.of(BigDecimal.TEN, EUR);
             Money usd = Money.of(BigDecimal.TEN, USD);
 
@@ -181,7 +176,7 @@ class MoneyTest {
 
         @Test
         @DisplayName("Should consider amounts equal irrespective of decimal scale")
-        void shouldBeEqualRegardlessOfScale() {
+        void should_be_equal_when_amounts_match_regardless_of_scale() {
             Money m1 = Money.of(new BigDecimal("10.0"), EUR);
             Money m2 = Money.of(new BigDecimal("10.000"), EUR);
 
@@ -191,7 +186,7 @@ class MoneyTest {
 
         @Test
         @DisplayName("Should not be equal if currencies differ")
-        void shouldNotBeEqualIfCurrencyDiffers() {
+        void should_not_be_equal_when_currencies_differ() {
             Money m1 = Money.of(new BigDecimal("10.00"), EUR);
             Money m2 = Money.of(new BigDecimal("10.00"), USD);
 
@@ -205,7 +200,7 @@ class MoneyTest {
 
         @Test
         @DisplayName("Should return readable string representation")
-        void shouldReturnReadableString() {
+        void should_return_readable_string_when_to_string_invoked() {
             Money m = Money.of(new BigDecimal("99.99"), EUR);
 
             assertThat(m.toString()).isEqualTo("99.99 EUR");

@@ -15,12 +15,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
-/**
- * Unit tests for {@link SpringEventPublisherAdapter}.
- * <p>
- * Verifies event publishing delegation to Spring's {@link ApplicationEventPublisher}, constructor validation,
- * null event safety, and batch publishing semantics.
- */
 @DisplayName("SpringEventPublisherAdapter Unit Tests")
 class SpringEventPublisherAdapterTest {
 
@@ -28,7 +22,7 @@ class SpringEventPublisherAdapterTest {
 
     @Test
     @DisplayName("Should throw NullPointerException when publisher is null")
-    void constructor_nullPublisher_shouldThrow() {
+    void should_throw_null_pointer_exception_when_publisher_is_null() {
         assertThatThrownBy(() -> new SpringEventPublisherAdapter(null))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessage("publisher cannot be null");
@@ -36,7 +30,7 @@ class SpringEventPublisherAdapterTest {
 
     @Test
     @DisplayName("Should publish domain event to ApplicationEventPublisher")
-    void publish_validEvent_shouldDelegateToPublisher() {
+    void should_delegate_to_publisher_when_valid_event_published() {
         ApplicationEventPublisher publisher = Mockito.mock(ApplicationEventPublisher.class);
         SpringEventPublisherAdapter adapter = new SpringEventPublisherAdapter(publisher);
 
@@ -49,7 +43,7 @@ class SpringEventPublisherAdapterTest {
 
     @Test
     @DisplayName("Should silently ignore null event in publish")
-    void publish_nullEvent_shouldNotThrowOrPublish() {
+    void should_not_publish_when_event_is_null() {
         ApplicationEventPublisher publisher = Mockito.mock(ApplicationEventPublisher.class);
         SpringEventPublisherAdapter adapter = new SpringEventPublisherAdapter(publisher);
 
@@ -60,7 +54,7 @@ class SpringEventPublisherAdapterTest {
 
     @Test
     @DisplayName("Should publish all non-null domain events in publishAll")
-    void publishAll_validList_shouldPublishAll() {
+    void should_publish_all_events_when_valid_list_provided() {
         ApplicationEventPublisher publisher = Mockito.mock(ApplicationEventPublisher.class);
         SpringEventPublisherAdapter adapter = new SpringEventPublisherAdapter(publisher);
 
@@ -75,7 +69,7 @@ class SpringEventPublisherAdapterTest {
 
     @Test
     @DisplayName("Should ignore null or empty lists, and skip null elements in publishAll")
-    void publishAll_edgeCases_shouldHandleGracefully() {
+    void should_handle_gracefully_when_list_contains_nulls_or_is_empty() {
         ApplicationEventPublisher publisher = Mockito.mock(ApplicationEventPublisher.class);
         SpringEventPublisherAdapter adapter = new SpringEventPublisherAdapter(publisher);
 

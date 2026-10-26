@@ -10,18 +10,12 @@ import java.time.Duration;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verify;
 
-/**
- * Unit tests for {@link EventPublicationRepublisher}.
- * <p>
- * Verifies defensive parameter checks and delegation to Spring Modulith's {@link IncompleteEventPublications}
- * for resubmitting incomplete publications older than the defined stale threshold.
- */
 @DisplayName("EventPublicationRepublisher Unit Tests")
 class EventPublicationRepublisherTest {
 
     @Test
     @DisplayName("Should throw NullPointerException when incompletePublications is null")
-    void constructor_nullDependency_shouldThrow() {
+    void should_throw_null_pointer_exception_when_dependency_is_null() {
         assertThatThrownBy(() -> new EventPublicationRepublisher(null))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessage("incompletePublications cannot be null");
@@ -29,7 +23,7 @@ class EventPublicationRepublisherTest {
 
     @Test
     @DisplayName("Should trigger resubmission with 1-minute stale threshold")
-    void resubmitFailedEvents_shouldCallIncompletePublications() {
+    void should_delegate_to_incomplete_publications_when_resubmitting_failed_events() {
         IncompleteEventPublications publications = Mockito.mock(IncompleteEventPublications.class);
         EventPublicationRepublisher republisher = new EventPublicationRepublisher(publications);
 

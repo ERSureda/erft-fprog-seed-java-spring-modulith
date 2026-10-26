@@ -20,12 +20,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/**
- * Unit tests for {@link ExecutionContextFilter}.
- * <p>
- * Verifies extraction of tenant identifier, user identity, correlation identifiers, and roles from HTTP headers,
- * propagation into {@link ExecutionContextHolder} and SLF4J MDC, and mandatory cleanup in filter completion.
- */
 @DisplayName("ExecutionContextFilter Unit Tests")
 class ExecutionContextFilterTest {
 
@@ -46,7 +40,7 @@ class ExecutionContextFilterTest {
 
     @Test
     @DisplayName("Should extract headers and populate ExecutionContext and MDC for downstream filter")
-    void withAllHeaders_shouldPopulateContextAndMdc() throws ServletException, IOException {
+    void should_populate_context_and_mdc_when_all_headers_provided() throws ServletException, IOException {
         UUID tenantId = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
         String correlationId = "corr-123";
@@ -96,7 +90,7 @@ class ExecutionContextFilterTest {
 
     @Test
     @DisplayName("Should default to anonymous context when headers are missing")
-    void withNoHeaders_shouldDefaultToAnonymous() throws ServletException, IOException {
+    void should_default_to_anonymous_when_headers_missing() throws ServletException, IOException {
         MockHttpServletRequest request = new MockHttpServletRequest();
         MockHttpServletResponse response = new MockHttpServletResponse();
 
@@ -121,7 +115,7 @@ class ExecutionContextFilterTest {
 
     @Test
     @DisplayName("Should safely ignore malformed UUIDs without throwing")
-    void withInvalidUuids_shouldIgnoreGracefully() throws ServletException, IOException {
+    void should_ignore_gracefully_when_uuids_are_invalid() throws ServletException, IOException {
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.addHeader(ApiHeaders.TENANT_ID, "not-a-uuid");
         request.addHeader(ApiHeaders.USER_ID, "invalid-user-uuid");
@@ -145,7 +139,7 @@ class ExecutionContextFilterTest {
 
     @Test
     @DisplayName("Should parse single role without commas")
-    void withSingleRole_shouldParseCorrectly() throws ServletException, IOException {
+    void should_parse_correctly_when_single_role_provided() throws ServletException, IOException {
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.addHeader(ApiHeaders.ROLES, "ROLE_USER");
         MockHttpServletResponse response = new MockHttpServletResponse();
@@ -166,7 +160,7 @@ class ExecutionContextFilterTest {
 
     @Test
     @DisplayName("Should always clear context and MDC even when filter chain throws an exception")
-    void whenFilterChainThrows_shouldAlwaysClear() {
+    void should_always_clear_context_when_filter_chain_throws_exception() {
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.addHeader(ApiHeaders.TENANT_ID, UUID.randomUUID().toString());
         request.addHeader(ApiHeaders.USER_ID, UUID.randomUUID().toString());
@@ -191,7 +185,7 @@ class ExecutionContextFilterTest {
 
     @Test
     @DisplayName("Should propagate custom correlationId and set it on response header")
-    void withCorrelationId_shouldPropagateAndSetResponseHeader() throws ServletException, IOException {
+    void should_propagate_correlation_id_when_custom_header_provided() throws ServletException, IOException {
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.addHeader(ApiHeaders.CORRELATION_ID, "req-xyz-987");
         MockHttpServletResponse response = new MockHttpServletResponse();

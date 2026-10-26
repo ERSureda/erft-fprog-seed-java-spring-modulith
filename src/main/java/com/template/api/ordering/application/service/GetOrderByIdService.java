@@ -6,26 +6,29 @@ import com.template.api.ordering.application.query.GetOrderByIdQuery;
 import com.template.api.ordering.application.result.OrderResult;
 import com.template.api.ordering.domain.OrderingError;
 import com.template.api.ordering.domain.model.Order;
+import com.template.api.shared.application.context.ExecutionContext;
+import com.template.api.shared.application.port.out.ExecutionContextPort;
+import com.template.api.shared.domain.exception.ForbiddenException;
 import com.template.api.shared.domain.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Application service orchestrating read-only order queries directly to DTO projections (CQRS).
- * <p>
- * Executes queries under read-only transaction semantics without hydrating domain entity models.
- * Conforms to APP-01, OUT-04, and TRX-01.
- */
 @Service
 @RequiredArgsConstructor
 public class GetOrderByIdService implements GetOrderByIdUseCase {
 
     private final OrderQueryPort orderQueryPort;
+    private final ExecutionContextPort executionContextPort;
 
     @Override
     @Transactional(readOnly = true)
     public OrderResult execute(GetOrderByIdQuery query) {
+        ExecutionContext context = executionContextPort.current();
+        if (context == null || !context.hasTenant()) {
+            throw new ForbiddenException("Missing required tenant context for order query");
+        }
+        context.requireTenantId();
         return orderQueryPort.findOrderResultById(query.orderId())
                 .orElseThrow(() -> new ResourceNotFoundException(OrderingError.ORDERING_ORDER_NOT_FOUND, Order.class, query.orderId()));
     }

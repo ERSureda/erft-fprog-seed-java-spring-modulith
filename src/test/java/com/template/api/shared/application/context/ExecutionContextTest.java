@@ -12,17 +12,12 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/**
- * Test suite for {@link ExecutionContext}.
- * <p>
- * Verifies caller classification, role verification, tenant guards, and immutable state defense.
- */
 @DisplayName("ExecutionContext Unit Tests")
 class ExecutionContextTest {
 
     @Test
     @DisplayName("Should create context with full attributes")
-    void fullAttributes_shouldStoreValues() {
+    void should_store_values_when_full_attributes_provided() {
         UUID tenantId = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
         Set<String> roles = Set.of("ROLE_USER", "ROLE_ADMIN");
@@ -41,7 +36,7 @@ class ExecutionContextTest {
 
     @Test
     @DisplayName("Should resolve UserType.SAAS_ADMIN when role contains SAAS_ADMIN or ROLE_SAAS_ADMIN")
-    void resolveUserType_saasAdmin() {
+    void should_resolve_saas_admin_when_role_contains_saas_admin() {
         UUID tenantId = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
 
@@ -59,7 +54,7 @@ class ExecutionContextTest {
 
     @Test
     @DisplayName("Should resolve UserType.TENANT_USER when user has tenantId and is not SAAS_ADMIN")
-    void resolveUserType_tenantUser() {
+    void should_resolve_tenant_user_when_user_has_tenant_and_not_saas_admin() {
         UUID tenantId = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
 
@@ -73,7 +68,7 @@ class ExecutionContextTest {
 
     @Test
     @DisplayName("Should resolve UserType.CLIENT when user has no tenantId and is not SAAS_ADMIN")
-    void resolveUserType_client() {
+    void should_resolve_client_when_user_has_no_tenant_and_not_saas_admin() {
         UUID userId = UUID.randomUUID();
 
         ExecutionContext ctx = new ExecutionContext(null, userId, Set.of("USER"));
@@ -86,7 +81,7 @@ class ExecutionContextTest {
 
     @Test
     @DisplayName("Should resolve UserType.ANONYMOUS when userId is null")
-    void resolveUserType_anonymous() {
+    void should_resolve_anonymous_when_user_id_is_null() {
         ExecutionContext ctx = new ExecutionContext(null, null, Set.of("GUEST"));
 
         assertThat(ctx.userType()).isEqualTo(UserType.ANONYMOUS);
@@ -95,7 +90,7 @@ class ExecutionContextTest {
 
     @Test
     @DisplayName("Should provide cached anonymous singleton")
-    void anonymous_singleton() {
+    void should_provide_cached_anonymous_singleton_when_invoked() {
         ExecutionContext anon = ExecutionContext.anonymous();
 
         assertThat(anon.userType()).isEqualTo(UserType.ANONYMOUS);
@@ -110,7 +105,7 @@ class ExecutionContextTest {
 
     @Test
     @DisplayName("Should support 4-argument constructor with correlationId")
-    void constructorWithCorrelationId_shouldStoreTrimmedValue() {
+    void should_store_trimmed_value_when_constructor_with_correlation_id_invoked() {
         UUID tenantId = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
 
@@ -122,7 +117,7 @@ class ExecutionContextTest {
 
     @Test
     @DisplayName("Blank correlationId should be normalized to null")
-    void blankCorrelationId_shouldBeNull() {
+    void should_normalize_to_null_when_correlation_id_is_blank() {
         ExecutionContext ctx = new ExecutionContext(null, null, null, "   ");
 
         assertThat(ctx.correlationId()).isNull();
@@ -131,7 +126,7 @@ class ExecutionContextTest {
 
     @Test
     @DisplayName("hasAnyRole should check against varargs without collection allocations")
-    void hasAnyRole_behavior() {
+    void should_evaluate_roles_correctly_when_has_any_role_invoked() {
         ExecutionContext ctx = new ExecutionContext(null, UUID.randomUUID(), Set.of("OPERATOR", "VIEWER"));
 
         assertThat(ctx.hasAnyRole("ADMIN", "OPERATOR")).isTrue();
@@ -146,7 +141,7 @@ class ExecutionContextTest {
 
     @Test
     @DisplayName("requireUserId should return userId or throw UnauthenticatedException")
-    void requireUserId_behavior() {
+    void should_return_user_id_or_throw_when_require_user_id_invoked() {
         UUID userId = UUID.randomUUID();
         ExecutionContext authed = new ExecutionContext(null, userId, Set.of());
         ExecutionContext anon = ExecutionContext.anonymous();
@@ -159,7 +154,7 @@ class ExecutionContextTest {
 
     @Test
     @DisplayName("requireTenantId should return tenantId or throw ForbiddenException")
-    void requireTenantId_behavior() {
+    void should_return_tenant_id_or_throw_when_require_tenant_id_invoked() {
         UUID tenantId = UUID.randomUUID();
         ExecutionContext withTenant = new ExecutionContext(tenantId, UUID.randomUUID(), Set.of());
         ExecutionContext withoutTenant = new ExecutionContext(null, UUID.randomUUID(), Set.of());
@@ -172,7 +167,7 @@ class ExecutionContextTest {
 
     @Test
     @DisplayName("hasTenantRole should verify both tenant existence and role presence")
-    void hasTenantRole_behavior() {
+    void should_verify_tenant_and_role_when_has_tenant_role_invoked() {
         UUID tenantId = UUID.randomUUID();
         ExecutionContext ctx = new ExecutionContext(tenantId, UUID.randomUUID(), Set.of("TENANT_ADMIN"));
         ExecutionContext noTenantCtx = new ExecutionContext(null, UUID.randomUUID(), Set.of("TENANT_ADMIN"));
@@ -184,7 +179,7 @@ class ExecutionContextTest {
 
     @Test
     @DisplayName("requireTenantRole should succeed or throw ForbiddenException")
-    void requireTenantRole_behavior() {
+    void should_succeed_or_throw_forbidden_when_require_tenant_role_invoked() {
         UUID tenantId = UUID.randomUUID();
         ExecutionContext validCtx = new ExecutionContext(tenantId, UUID.randomUUID(), Set.of("TENANT_ADMIN"));
         ExecutionContext missingRoleCtx = new ExecutionContext(tenantId, UUID.randomUUID(), Set.of("TENANT_USER"));
@@ -203,7 +198,7 @@ class ExecutionContextTest {
 
     @Test
     @DisplayName("Roles collection should be unmodifiable and defensively copied")
-    void rolesImmutability_shouldDefendAgainstMutation() {
+    void should_defend_against_mutation_when_roles_collection_accessed() {
         Set<String> mutableRoles = new HashSet<>();
         mutableRoles.add("ROLE_A");
 

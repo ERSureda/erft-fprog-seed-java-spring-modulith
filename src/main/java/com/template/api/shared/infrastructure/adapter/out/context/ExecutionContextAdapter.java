@@ -6,12 +6,6 @@ import org.springframework.stereotype.Component;
 
 import java.util.Optional;
 
-/**
- * Outbound adapter implementing {@link ExecutionContextPort} via {@link ExecutionContextHolder}.
- * <p>
- * Decouples use cases from thread-local static holders.
- * Conforms to SED-03.
- */
 @Component
 public class ExecutionContextAdapter implements ExecutionContextPort {
 

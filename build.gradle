@@ -31,7 +31,6 @@ ext {
 	set('springModulithVersion', '1.4.0')
 	set('testcontainersVersion', '1.20.5')
 	set('archunitVersion', '1.4.1')
-	set('mapstructVersion', '1.6.3')
 	set('springdocVersion', '2.8.5')
 	set('awaitilityVersion', '4.2.2')
 }
@@ -78,11 +77,8 @@ dependencies {
 	// ==========================================
 	compileOnly 'org.projectlombok:lombok'
 	annotationProcessor 'org.projectlombok:lombok'
-	annotationProcessor 'org.projectlombok:lombok-mapstruct-binding:0.2.0'
 	testCompileOnly 'org.projectlombok:lombok'
 	testAnnotationProcessor 'org.projectlombok:lombok'
-	implementation "org.mapstruct:mapstruct:${mapstructVersion}"
-	annotationProcessor "org.mapstruct:mapstruct-processor:${mapstructVersion}"
 	annotationProcessor 'org.springframework.boot:spring-boot-configuration-processor'
 
 	// ==========================================
@@ -119,16 +115,18 @@ tasks.register('syncStandards') {
 	group = 'fprog'
 	description = 'Sincroniza atómicamente los estándares desde el repositorio central de GitHub'
 	doLast {
-		def preset = project.findProperty('standards.preset') ?: 'java-spring-modulith'
-		def standardsVersion = project.findProperty('standards.version') ?: 'v1.0.0'
-		def baseUrl = "https://raw.githubusercontent.com/erfp/erfp-fprog-standards/${standardsVersion}/presets/${preset}"
+		def org = project.findProperty('standards.org') ?: 'erft'
+		def preset = project.findProperty('standards.preset') ?: 'erft-fprog-preset-java-spring-modulith'
+		def standardsVersion = project.findProperty('standards.version') ?: 'main'
+		def baseUrl = "https://raw.githubusercontent.com/${org}/${preset}/${standardsVersion}"
 		def targetDir = file('.standards')
+		def adrsDir = new File(targetDir, 'adrs')
 
-		if (!targetDir.exists()) {
-			targetDir.mkdirs()
+		if (!adrsDir.exists()) {
+			adrsDir.mkdirs()
 		}
 
-		['ARCHITECTURE.md', 'EXCEPTIONS.md', 'TESTING.md', 'SEED_SPEC.md'].each { fileName ->
+		['ARCHITECTURE.md', 'EXCEPTIONS.md', 'TESTING.md', 'dag-manifest.yaml'].each { fileName ->
 			def destFile = new File(targetDir, fileName)
 			def url = "${baseUrl}/${fileName}"
 			println "Descargando ${url} -> ${destFile.path}..."
@@ -136,6 +134,18 @@ tasks.register('syncStandards') {
 				destFile.text = new URL(url).text
 			} catch (Exception ex) {
 				println "Aviso: No se pudo descargar ${fileName} desde ${url}: ${ex.message}"
+			}
+		}
+
+		(1..7).each { idx ->
+			def adrName = String.format('ADR_%03d.md', idx)
+			def destFile = new File(adrsDir, adrName)
+			def url = "${baseUrl}/adrs/${adrName}"
+			println "Descargando ${url} -> ${destFile.path}..."
+			try {
+				destFile.text = new URL(url).text
+			} catch (Exception ex) {
+				println "Aviso: No se pudo descargar ${adrName} desde ${url}: ${ex.message}"
 			}
 		}
 		println "Sincronización de estándares completada (@${standardsVersion})."

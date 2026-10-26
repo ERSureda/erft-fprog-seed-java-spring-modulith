@@ -9,18 +9,12 @@ import org.springframework.modulith.docs.Documenter;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/**
- * Architectural fitness function verifying Spring Modulith structure and generating living documentation.
- * <p>
- * Validates module boundaries, cyclic dependency absence, and generates PlantUML architecture diagrams.
- * Conforms to ARC-01 and ARC-03.
- */
 @DisplayName("Spring Modulith Architectural Verification")
 class ModulithStructureTest {
 
     @Test
     @DisplayName("Debe verificar que la estructura modular y fronteras de Modulith son válidas (ARC-01)")
-    void verifyModulithStructure() {
+    void should_verify_modulith_structure_when_inspected() {
         ApplicationModules modules = ApplicationModules.of(ApiApplication.class);
         modules.verify();
 
@@ -36,7 +30,7 @@ class ModulithStructureTest {
 
     @Test
     @DisplayName("Debe generar la documentación y diagramas de arquitectura de Modulith (ARC-03)")
-    void generateArchitectureDocumentation() {
+    void should_generate_architecture_documentation_when_invoked() {
         new Documenter(ApplicationModules.of(ApiApplication.class))
                 .writeDocumentation()
                 .writeIndividualModulesAsPlantUml();

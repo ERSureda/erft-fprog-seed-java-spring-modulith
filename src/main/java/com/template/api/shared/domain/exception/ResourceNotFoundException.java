@@ -4,12 +4,6 @@ import com.template.api.shared.domain.error.CommonError;
 import com.template.api.shared.domain.error.ErrorCategory;
 import com.template.api.shared.domain.error.ErrorCode;
 
-/**
- * Domain exception indicating a requested aggregate root, entity, or resource could not be found.
- * <p>
- * Maps to HTTP 404 Not Found at perimeter web adapter boundaries.
- * Conforms to DOM-01 and ADR-003.
- */
 public class ResourceNotFoundException extends BaseException {
 
     public ResourceNotFoundException(String message) {

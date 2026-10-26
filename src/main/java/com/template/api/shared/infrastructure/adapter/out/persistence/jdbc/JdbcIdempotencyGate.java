@@ -1,5 +1,6 @@
 package com.template.api.shared.infrastructure.adapter.out.persistence.jdbc;
 
+import com.template.api.shared.application.port.out.IdempotencyGate;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Component;
@@ -7,40 +8,66 @@ import org.springframework.stereotype.Component;
 import java.util.Map;
 import java.util.UUID;
 
-/**
- * Shared JDBC adapter for consumer idempotency verification against the {@code processed_events} table.
- * <p>
- * Ensures effectively-once processing semantics for asynchronous consumers.
- * Conforms to OUT-05 and TRX-05.
- */
 @Component
 @RequiredArgsConstructor
-public class JdbcIdempotencyGate {
+public class JdbcIdempotencyGate implements IdempotencyGate {
 
     private final NamedParameterJdbcTemplate jdbcTemplate;
 
-    public boolean tryAcquire(UUID eventId, String consumerName) {
+    @Override
+    public boolean tryAcquire(String moduleSchema, UUID eventId, String consumerName) {
+        String tableName = resolveTable(moduleSchema);
         String sql = """
-            INSERT INTO processed_events (event_id, consumer_name, processed_at)
+            INSERT INTO %s (event_id, consumer_name, processed_at)
             VALUES (:eventId, :consumerName, clock_timestamp())
-            ON CONFLICT (event_id) DO NOTHING
-        """;
+            ON CONFLICT (event_id, consumer_name) DO NOTHING
+        """.formatted(tableName);
         int rows = jdbcTemplate.update(sql, Map.of(
                 "eventId", eventId,
-                "consumerName", consumerName
+                "consumerName", consumerName != null ? consumerName : "default"
         ));
         return rows > 0;
     }
 
+    @Override
+    public void release(String moduleSchema, UUID eventId, String consumerName) {
+        String tableName = resolveTable(moduleSchema);
+        if (consumerName != null) {
+            String sql = "DELETE FROM " + tableName + " WHERE event_id = :eventId AND consumer_name = :consumerName";
+            jdbcTemplate.update(sql, Map.of(
+                    "eventId", eventId,
+                    "consumerName", consumerName
+            ));
+        } else {
+            String sql = "DELETE FROM " + tableName + " WHERE event_id = :eventId";
+            jdbcTemplate.update(sql, Map.of("eventId", eventId));
+        }
+    }
+
+    @Override
     public boolean release(UUID eventId) {
-        String sql = "DELETE FROM processed_events WHERE event_id = :eventId";
+        return release(null, eventId);
+    }
+
+    public boolean release(String moduleSchema, UUID eventId) {
+        String tableName = resolveTable(moduleSchema);
+        String sql = "DELETE FROM " + tableName + " WHERE event_id = :eventId";
         int rows = jdbcTemplate.update(sql, Map.of("eventId", eventId));
         return rows > 0;
     }
 
-    public boolean isProcessed(UUID eventId) {
-        String sql = "SELECT COUNT(*) FROM processed_events WHERE event_id = :eventId";
+    @Override
+    public boolean isProcessed(String moduleSchema, UUID eventId) {
+        String tableName = resolveTable(moduleSchema);
+        String sql = "SELECT COUNT(*) FROM " + tableName + " WHERE event_id = :eventId";
         Integer count = jdbcTemplate.queryForObject(sql, Map.of("eventId", eventId), Integer.class);
         return count != null && count > 0;
+    }
+
+    private String resolveTable(String moduleSchema) {
+        if (moduleSchema == null || moduleSchema.isBlank() || "default".equalsIgnoreCase(moduleSchema.trim())) {
+            return "processed_events";
+        }
+        return moduleSchema.trim() + ".processed_events";
     }
 }

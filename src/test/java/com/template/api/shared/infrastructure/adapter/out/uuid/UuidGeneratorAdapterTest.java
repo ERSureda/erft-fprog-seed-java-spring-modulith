@@ -14,12 +14,6 @@ import java.util.concurrent.Executors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/**
- * Unit tests for {@link UuidGeneratorAdapter}.
- * <p>
- * Verifies generation of RFC 9562 UUIDv7 identifiers, monotonic temporal ordering, string conversion via port defaults,
- * and uniqueness under multi-threaded concurrency.
- */
 @DisplayName("UuidGeneratorAdapter Unit Tests")
 class UuidGeneratorAdapterTest {
 
@@ -32,7 +26,7 @@ class UuidGeneratorAdapterTest {
 
     @Test
     @DisplayName("Should generate UUIDv7 compliant with RFC 9562 (version 7, variant 2)")
-    void shouldGenerateValidUuidV7() {
+    void should_generate_valid_uuid_v7_when_generate_id_invoked() {
         UUID id = generator.generateId();
 
         assertThat(id).isNotNull();
@@ -42,7 +36,7 @@ class UuidGeneratorAdapterTest {
 
     @Test
     @DisplayName("Should generate valid string representation via default port method")
-    void shouldGenerateValidUuidString() {
+    void should_generate_valid_string_when_generate_id_string_invoked() {
         String idString = generator.generateIdString();
 
         assertThat(idString).isNotBlank();
@@ -53,7 +47,7 @@ class UuidGeneratorAdapterTest {
 
     @Test
     @DisplayName("Sequentially generated identifiers should be monotonically increasing")
-    void shouldGenerateMonotonicallyIncreasingUuids() {
+    void should_generate_monotonically_increasing_uuids_when_generated_sequentially() {
         UUID previous = generator.generateId();
 
         for (int i = 0; i < 1_000; i++) {
@@ -65,7 +59,7 @@ class UuidGeneratorAdapterTest {
 
     @Test
     @DisplayName("Should ensure absolute uniqueness under high multi-threaded concurrency")
-    void shouldEnsureUniquenessUnderHighConcurrency() throws InterruptedException {
+    void should_ensure_uniqueness_when_generated_under_high_concurrency() throws InterruptedException {
         int threads = 16;
         int operationsPerThread = 1_000;
         int totalExpectedIds = threads * operationsPerThread;

@@ -4,19 +4,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
 
-/**
- * Minimalist immutable container for offset-based paginated query results.
- * <p>
- * Encapsulates a page window alongside total count and computed page metadata.
- * Conforms to SED-01.
- *
- * @param items         immutable list of elements present in the current page
- * @param page          zero-based page index
- * @param size          page size limit
- * @param totalElements aggregate count of matching records across all pages
- * @param totalPages    total count of computed pages
- * @param <T>           type of items contained in the result
- */
 public record PageResult<T>(
         List<T> items,
         int page,

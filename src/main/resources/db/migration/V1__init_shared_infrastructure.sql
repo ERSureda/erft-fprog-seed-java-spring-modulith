@@ -60,23 +60,6 @@ CREATE TYPE shared.actor_type AS ENUM (
     'API_CLIENT'
 );
 
-CREATE TYPE shared.vehicle_type AS ENUM (
-    'SEDAN',
-    'ESTATE',
-    'VAN',
-    'EXECUTIVE',
-    'ACCESSIBLE',
-    'ECO'
-);
-
-CREATE TYPE shared.payment_method AS ENUM (
-    'CASH',
-    'CREDIT_CARD',
-    'IN_APP_WALLET',
-    'CORPORATE_ACCOUNT',
-    'VOUCHER'
-);
-
 CREATE TYPE shared.outbox_status AS ENUM (
     'PENDING',
     'PROCESSING',
@@ -158,8 +141,7 @@ CREATE TABLE public.processed_events (
     event_id      UUID         NOT NULL,
     consumer_name VARCHAR(128) NOT NULL,
 
-    CONSTRAINT pk_processed_events        PRIMARY KEY (event_id),
-    CONSTRAINT uq_processed_events_target UNIQUE (event_id, consumer_name)
+    CONSTRAINT pk_processed_events PRIMARY KEY (event_id, consumer_name)
 ) WITH (
     autovacuum_vacuum_scale_factor = 0.02,
     autovacuum_analyze_scale_factor = 0.02
@@ -181,6 +163,10 @@ BEGIN
         GRANT USAGE ON SCHEMA shared TO template_app;
         GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA shared TO template_app;
         ALTER DEFAULT PRIVILEGES IN SCHEMA shared GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO template_app;
+
+        GRANT USAGE ON SCHEMA public TO template_app;
+        GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.outbox_events TO template_app;
+        GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.processed_events TO template_app;
     END IF;
 END
 $$;

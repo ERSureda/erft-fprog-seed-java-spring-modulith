@@ -25,11 +25,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * Test suite for {@link OrderController}.
- * <p>
- * Verifies web slice behavior, HTTP status codes, JSON serialization, and Bean Validation constraints.
- */
 @WebMvcTest(controllers = OrderController.class)
 @Import({GlobalExceptionHandler.class, ExecutionContextFilter.class})
 @DisplayName("OrderController Web Slice Tests")
@@ -45,8 +40,8 @@ class OrderControllerTest {
     private GetOrderByIdUseCase getOrderByIdUseCase;
 
     @Test
-    @DisplayName("should_Return201Created_when_PayloadIsValid")
-    void should_Return201Created_when_PayloadIsValid() throws Exception {
+    @DisplayName("should_return_201_created_when_payload_is_valid")
+    void should_return_201_created_when_payload_is_valid() throws Exception {
         UUID orderId = UUID.randomUUID();
         when(createOrderUseCase.execute(any())).thenReturn(
                 new OrderResult(orderId, "PENDING", new BigDecimal("100.00"), "EUR")
@@ -72,8 +67,8 @@ class OrderControllerTest {
     }
 
     @Test
-    @DisplayName("should_Return400BadRequest_when_ValidationFails")
-    void should_Return400BadRequest_when_ValidationFails() throws Exception {
+    @DisplayName("should_return_400_bad_request_when_validation_fails")
+    void should_return_400_bad_request_when_validation_fails() throws Exception {
         mockMvc.perform(post("/api/v1/orders")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -88,8 +83,8 @@ class OrderControllerTest {
     }
 
     @Test
-    @DisplayName("should_Return200Ok_when_OrderExists")
-    void should_Return200Ok_when_OrderExists() throws Exception {
+    @DisplayName("should_return_200_ok_when_order_exists")
+    void should_return_200_ok_when_order_exists() throws Exception {
         UUID orderId = UUID.randomUUID();
         when(getOrderByIdUseCase.execute(any())).thenReturn(
                 new OrderResult(orderId, "CONFIRMED", new BigDecimal("50.00"), "EUR")

@@ -15,11 +15,6 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
-/**
- * Test suite for {@link OrderResultRowMapper}.
- * <p>
- * Verifies SQL ResultSet column extraction and mapping into {@link OrderResult}.
- */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("OrderResultRowMapper Unit Tests")
 class OrderResultRowMapperTest {
@@ -30,8 +25,8 @@ class OrderResultRowMapperTest {
     private final OrderResultRowMapper mapper = new OrderResultRowMapper();
 
     @Test
-    @DisplayName("should_MapResultSetRowToOrderResult_Correctly")
-    void should_MapResultSetRowToOrderResult_Correctly() throws SQLException {
+    @DisplayName("should_map_result_set_row_to_order_result_when_row_is_valid")
+    void should_map_result_set_row_to_order_result_when_row_is_valid() throws SQLException {
         UUID orderId = UUID.randomUUID();
         when(resultSet.getObject("id", UUID.class)).thenReturn(orderId);
         when(resultSet.getString("status")).thenReturn("CONFIRMED");

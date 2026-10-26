@@ -18,11 +18,6 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/**
- * Integration test suite for {@link OrderJdbcRepository}.
- * <p>
- * Verifies SQL execution against PostgreSQL using {@link NamedParameterJdbcTemplate}.
- */
 @JdbcTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import({OrderJdbcRepository.class, OrderResultRowMapper.class})
@@ -36,15 +31,18 @@ class OrderJdbcRepositoryTest extends AbstractPostgresIntegrationTest {
     private NamedParameterJdbcTemplate jdbcTemplate;
 
     @Test
-    @DisplayName("should_FindOrderResultById_when_OrderExists")
-    void should_FindOrderResultById_when_OrderExists() {
+    @DisplayName("should_find_order_result_by_id_when_order_exists")
+    void should_find_order_result_by_id_when_order_exists() {
         UUID orderId = UUID.randomUUID();
+        UUID tenantId = UUID.randomUUID();
         UUID customerId = UUID.randomUUID();
+        jdbcTemplate.getJdbcTemplate().execute("SELECT set_config('app.current_tenant_id', '" + tenantId + "', false)");
         jdbcTemplate.update("""
-            INSERT INTO ordering.orders (id, customer_id, amount, currency, status, version)
-            VALUES (:id, :customerId, :amount, :currency, :status, 0)
+            INSERT INTO ordering.orders (id, tenant_id, customer_id, amount, currency, status, version)
+            VALUES (:id, :tenantId, :customerId, :amount, :currency, :status, 0)
         """, Map.of(
                 "id", orderId,
+                "tenantId", tenantId,
                 "customerId", customerId,
                 "amount", new BigDecimal("120.00"),
                 "currency", "EUR",
@@ -61,8 +59,8 @@ class OrderJdbcRepositoryTest extends AbstractPostgresIntegrationTest {
     }
 
     @Test
-    @DisplayName("should_ReturnEmpty_when_OrderDoesNotExist")
-    void should_ReturnEmpty_when_OrderDoesNotExist() {
+    @DisplayName("should_return_empty_when_order_does_not_exist")
+    void should_return_empty_when_order_does_not_exist() {
         UUID missingId = UUID.randomUUID();
 
         Optional<OrderResult> result = repository.findOrderResultById(missingId);

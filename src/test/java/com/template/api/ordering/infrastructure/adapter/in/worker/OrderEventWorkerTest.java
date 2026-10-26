@@ -20,11 +20,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
-/**
- * Test suite for {@link OrderEventWorker}.
- * <p>
- * Verifies asynchronous event consumption, database idempotency locking, and duplicate event deduplication.
- */
 @SpringBootTest
 @DisplayName("OrderEventWorker Asynchronous & Idempotency Tests")
 class OrderEventWorkerTest extends AbstractPostgresIntegrationTest {
@@ -41,13 +36,13 @@ class OrderEventWorkerTest extends AbstractPostgresIntegrationTest {
     @BeforeEach
     void setUp() {
         if (jdbcTemplate != null) {
-            jdbcTemplate.getJdbcTemplate().execute("TRUNCATE TABLE processed_events");
+            jdbcTemplate.getJdbcTemplate().execute("TRUNCATE TABLE ordering.processed_events");
         }
     }
 
     @Test
-    @DisplayName("should_DeduplicateEvent_when_ReceivedTwiceWithSameEventId")
-    void should_DeduplicateEvent_when_ReceivedTwiceWithSameEventId() {
+    @DisplayName("should_deduplicate_event_when_received_twice_with_same_event_id")
+    void should_deduplicate_event_when_received_twice_with_same_event_id() {
         UUID eventId = UUID.randomUUID();
         String payloadJson = """
             {
@@ -60,7 +55,7 @@ class OrderEventWorkerTest extends AbstractPostgresIntegrationTest {
 
         await().atMost(Duration.ofSeconds(5)).untilAsserted(() -> {
             Integer count = jdbcTemplate.queryForObject(
-                    "SELECT COUNT(*) FROM processed_events WHERE event_id = :id",
+                    "SELECT COUNT(*) FROM ordering.processed_events WHERE event_id = :id",
                     Map.of("id", eventId),
                     Integer.class
             );

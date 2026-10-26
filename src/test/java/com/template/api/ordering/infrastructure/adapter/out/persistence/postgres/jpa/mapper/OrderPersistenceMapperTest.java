@@ -1,9 +1,9 @@
 package com.template.api.ordering.infrastructure.adapter.out.persistence.postgres.jpa.mapper;
 
-import com.template.api.shared.domain.valueobject.Money;
 import com.template.api.ordering.domain.model.Order;
 import com.template.api.ordering.domain.model.enums.OrderStatus;
 import com.template.api.ordering.infrastructure.adapter.out.persistence.postgres.jpa.entity.OrderEntity;
+import com.template.api.shared.domain.valueobject.Money;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -15,11 +15,6 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/**
- * Test suite for {@link OrderPersistenceMapper}.
- * <p>
- * Verifies bidirectional mapping between {@link Order} aggregates and {@link OrderEntity} records.
- */
 @DisplayName("OrderPersistenceMapper Unit Tests")
 class OrderPersistenceMapperTest {
 
@@ -31,15 +26,17 @@ class OrderPersistenceMapperTest {
     }
 
     @Test
-    @DisplayName("should_MapDomainOrderToEntity_Correctly")
-    void should_MapDomainOrderToEntity_Correctly() {
+    @DisplayName("should_map_domain_order_to_entity_when_domain_order_provided")
+    void should_map_domain_order_to_entity_when_domain_order_provided() {
         UUID orderId = UUID.randomUUID();
+        UUID tenantId = UUID.randomUUID();
         UUID customerId = UUID.randomUUID();
-        Order order = Order.create(orderId, customerId, Money.of(new BigDecimal("150.00"), Currency.getInstance("USD")));
+        Order order = Order.create(orderId, tenantId, customerId, Money.of(new BigDecimal("150.00"), Currency.getInstance("USD")));
 
         OrderEntity entity = mapper.toEntity(order);
 
         assertThat(entity.getId()).isEqualTo(order.getId());
+        assertThat(entity.getTenantId()).isEqualTo(tenantId);
         assertThat(entity.getCustomerId()).isEqualTo(customerId);
         assertThat(entity.getAmount()).isEqualByComparingTo(new BigDecimal("150.00"));
         assertThat(entity.getCurrency()).isEqualTo("USD");
@@ -50,25 +47,29 @@ class OrderPersistenceMapperTest {
     }
 
     @Test
-    @DisplayName("should_MapEntityToDomainOrder_Correctly")
-    void should_MapEntityToDomainOrder_Correctly() {
+    @DisplayName("should_map_entity_to_domain_order_when_entity_provided")
+    void should_map_entity_to_domain_order_when_entity_provided() {
         UUID orderId = UUID.randomUUID();
+        UUID tenantId = UUID.randomUUID();
         UUID customerId = UUID.randomUUID();
         Instant now = Instant.now();
         OrderEntity entity = new OrderEntity(
                 orderId,
+                tenantId,
                 customerId,
                 new BigDecimal("99.99"),
                 "EUR",
                 "CONFIRMED",
                 1L,
                 now,
-                now
+                now,
+                null
         );
 
         Order order = mapper.toDomain(entity);
 
         assertThat(order.getId()).isEqualTo(orderId);
+        assertThat(order.getTenantId()).isEqualTo(tenantId);
         assertThat(order.getCustomerId()).isEqualTo(customerId);
         assertThat(order.getAmount().amount()).isEqualByComparingTo(new BigDecimal("99.99"));
         assertThat(order.getAmount().currency().getCurrencyCode()).isEqualTo("EUR");
@@ -79,8 +80,8 @@ class OrderPersistenceMapperTest {
     }
 
     @Test
-    @DisplayName("should_ReturnNull_when_SourceIsNull")
-    void should_ReturnNull_when_SourceIsNull() {
+    @DisplayName("should_return_null_when_source_is_null")
+    void should_return_null_when_source_is_null() {
         assertThat(mapper.toEntity(null)).isNull();
         assertThat(mapper.toDomain(null)).isNull();
     }

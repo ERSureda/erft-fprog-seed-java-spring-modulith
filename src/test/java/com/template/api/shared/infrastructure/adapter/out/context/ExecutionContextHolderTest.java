@@ -6,17 +6,14 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/**
- * Unit tests for {@link ExecutionContextHolder}.
- * <p>
- * Verifies thread-local binding, retrieval, clearing, and multi-threaded isolation of request execution contexts.
- */
 @DisplayName("ExecutionContextHolder Unit Tests")
 class ExecutionContextHolderTest {
 
@@ -28,7 +25,7 @@ class ExecutionContextHolderTest {
 
     @Test
     @DisplayName("Should set and retrieve context on the same thread")
-    void setAndGet_shouldReturnContext() {
+    void should_return_context_when_set_and_get_invoked() {
         ExecutionContext context = ExecutionContext.anonymous();
 
         ExecutionContextHolder.set(context);
@@ -38,7 +35,7 @@ class ExecutionContextHolderTest {
 
     @Test
     @DisplayName("Should clear context when setting null or calling clear")
-    void clear_shouldRemoveContext() {
+    void should_remove_context_when_cleared_or_set_to_null() {
         ExecutionContext context = ExecutionContext.anonymous();
 
         ExecutionContextHolder.set(context);
@@ -54,7 +51,7 @@ class ExecutionContextHolderTest {
 
     @Test
     @DisplayName("Should maintain separate contexts across different threads")
-    void concurrency_threadsShouldHaveIsolatedContexts() throws InterruptedException {
+    void should_isolate_contexts_when_accessed_across_different_threads() throws InterruptedException {
         ExecutionContext mainContext = ExecutionContext.anonymous();
         ExecutionContextHolder.set(mainContext);
 
@@ -70,5 +67,25 @@ class ExecutionContextHolderTest {
         assertThat(latch.await(2, TimeUnit.SECONDS)).isTrue();
         assertThat(threadContext.get()).isNull();
         assertThat(ExecutionContextHolder.get()).isSameAs(mainContext);
+    }
+
+    @Test
+    @DisplayName("Should execute action within context and restore previous context")
+    void should_execute_and_restore_context_when_run_with_invoked() {
+        ExecutionContext previousContext = new ExecutionContext(UUID.randomUUID(), UUID.randomUUID(), Set.of("ADMIN"));
+        ExecutionContext innerContext = new ExecutionContext(UUID.randomUUID(), UUID.randomUUID(), Set.of("USER"));
+        ExecutionContextHolder.set(previousContext);
+
+        AtomicReference<ExecutionContext> executedContext = new AtomicReference<>();
+
+        ExecutionContextHolder.runWith(innerContext, () -> executedContext.set(ExecutionContextHolder.get()));
+
+        assertThat(executedContext.get()).isSameAs(innerContext);
+        assertThat(ExecutionContextHolder.get()).isSameAs(previousContext);
+
+        ExecutionContextHolder.clear();
+        ExecutionContextHolder.runWith(innerContext, () -> executedContext.set(ExecutionContextHolder.get()));
+        assertThat(executedContext.get()).isSameAs(innerContext);
+        assertThat(ExecutionContextHolder.get()).isNull();
     }
 }

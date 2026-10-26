@@ -3,16 +3,13 @@ package com.template.api.shared.application.port.out;
 import com.template.api.shared.domain.event.DomainEvent;
 
 import java.util.List;
+import java.util.UUID;
 
-/**
- * Outbound port for recording domain events into the transactional outbox buffer.
- * <p>
- * Implemented by persistence adapters to guarantee atomic event insertion alongside entity state changes.
- * Conforms to TRX-03 and SED-05.
- */
 public interface OutboxPublisherPort {
 
     void publish(DomainEvent event);
 
     void publishAll(List<DomainEvent> events);
+
+    void publish(String moduleSchema, String aggregateType, UUID aggregateId, DomainEvent event);
 }

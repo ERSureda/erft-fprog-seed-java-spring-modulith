@@ -9,12 +9,6 @@ import org.springframework.stereotype.Component;
 import java.util.Optional;
 import java.util.UUID;
 
-/**
- * Secondary outbound persistence adapter implementing {@link OrderQueryPort} via Spring JDBC.
- * <p>
- * Executes lightweight SQL projection queries returning DTOs directly without ORM overhead.
- * Conforms to OUT-04 and OUT-05.
- */
 @Component
 @RequiredArgsConstructor
 public class OrderJdbcQueryAdapter implements OrderQueryPort {
@@ -22,7 +16,7 @@ public class OrderJdbcQueryAdapter implements OrderQueryPort {
     private final OrderJdbcRepository repository;
 
     @Override
-    public Optional<OrderResult> findOrderResultById(UUID id) {
-        return repository.findOrderResultById(id);
+    public Optional<OrderResult> findOrderResultById(UUID orderId) {
+        return repository.findOrderResultById(orderId);
     }
 }

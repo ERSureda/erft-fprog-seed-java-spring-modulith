@@ -8,19 +8,10 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/**
- * Test suite for {@link BaseEntity}.
- * <p>
- * Verifies identity encapsulation and identity-based equality contracts.
- */
 @DisplayName("BaseEntity Unit Tests")
 class BaseEntityTest {
 
     static class TestEntity extends BaseEntity<UUID> {
-        TestEntity() {
-            super();
-        }
-
         TestEntity(UUID id) {
             super(id);
         }
@@ -34,7 +25,7 @@ class BaseEntityTest {
 
     @Test
     @DisplayName("Should return id via id() and getId()")
-    void accessors_shouldReturnId() {
+    void should_return_id_when_accessors_invoked() {
         UUID id = UUID.randomUUID();
         TestEntity entity = new TestEntity(id);
 
@@ -44,7 +35,7 @@ class BaseEntityTest {
 
     @Test
     @DisplayName("Should be equal when comparing the same instance")
-    void sameInstance_shouldBeEqual() {
+    void should_be_equal_when_comparing_same_instance() {
         TestEntity entity = new TestEntity(UUID.randomUUID());
 
         assertThat(entity.equals(entity)).isTrue();
@@ -52,7 +43,7 @@ class BaseEntityTest {
 
     @Test
     @DisplayName("Should be equal when IDs match and classes match")
-    void sameId_shouldBeEqual() {
+    void should_be_equal_when_same_id_and_same_class() {
         UUID id = UUID.randomUUID();
         TestEntity e1 = new TestEntity(id);
         TestEntity e2 = new TestEntity(id);
@@ -63,7 +54,7 @@ class BaseEntityTest {
 
     @Test
     @DisplayName("Should not be equal when IDs differ")
-    void differentId_shouldNotBeEqual() {
+    void should_not_be_equal_when_ids_differ() {
         TestEntity e1 = new TestEntity(UUID.randomUUID());
         TestEntity e2 = new TestEntity(UUID.randomUUID());
 
@@ -72,7 +63,7 @@ class BaseEntityTest {
 
     @Test
     @DisplayName("Should not be equal when comparing with null or different class")
-    void differentClassOrNull_shouldNotBeEqual() {
+    void should_not_be_equal_when_compared_with_null_or_different_class() {
         UUID id = UUID.randomUUID();
         TestEntity e1 = new TestEntity(id);
         AnotherEntity e2 = new AnotherEntity(id);
@@ -83,18 +74,8 @@ class BaseEntityTest {
     }
 
     @Test
-    @DisplayName("Should handle entities with null IDs safely")
-    void nullId_shouldHandleEqualitySafely() {
-        TestEntity unpersisted1 = new TestEntity();
-        TestEntity unpersisted2 = new TestEntity();
-
-        assertThat(unpersisted1.equals(unpersisted2)).isFalse();
-        assertThat(unpersisted1.hashCode()).isEqualTo(TestEntity.class.hashCode());
-    }
-
-    @Test
     @DisplayName("Should throw NullPointerException when parameterized constructor receives null id")
-    void constructor_nullId_shouldThrow() {
+    void should_throw_null_pointer_exception_when_id_is_null() {
         assertThatThrownBy(() -> new TestEntity(null))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessage("ENTITY_ID_CANNOT_BE_NULL");

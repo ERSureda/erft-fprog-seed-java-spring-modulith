@@ -11,12 +11,6 @@ import static com.tngtech.archunit.base.DescribedPredicate.describe;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noMethods;
 
-/**
- * Architectural fitness function validating web layer decoupling and transactional boundaries.
- * <p>
- * Prevents web adapters from depending directly on domain models except enums (INP-01)
- * and prohibits transactional demarcations on controllers (INP-02).
- */
 @AnalyzeClasses(packages = "com.template.api", importOptions = ImportOption.DoNotIncludeTests.class)
 class WebRulesArchTest {
 

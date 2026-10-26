@@ -6,24 +6,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
-/**
- * Base abstract class for Aggregate Roots in Domain-Driven Design (DDD).
- * <p>
- * Establishes a transactional consistency boundary for an entity cluster.
- * Encapsulates the recording and atomic draining of domain events emitted during state transitions,
- * and maintains an optimistic locking version counter.
- * Conforms to DOM-01, DOM-02, DOM-03, and TRX-02.
- *
- * @param <ID> unique identifier type of the aggregate root
- */
 public abstract class AggregateRoot<ID> extends BaseEntity<ID> {
 
     protected Long version;
     private transient List<DomainEvent> domainEvents;
-
-    protected AggregateRoot() {
-        super();
-    }
 
     protected AggregateRoot(ID id) {
         super(id);

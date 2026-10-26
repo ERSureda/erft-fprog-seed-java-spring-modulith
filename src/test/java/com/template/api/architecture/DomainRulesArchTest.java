@@ -9,12 +9,6 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.constructors;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.methods;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
-/**
- * Architectural fitness function validating domain layer purity and encapsulation.
- * <p>
- * Verifies domain independence from external frameworks (DOM-01), non-public constructors (DOM-02),
- * and absence of public setters on domain entities and aggregates (DOM-04).
- */
 @AnalyzeClasses(packages = "com.template.api", importOptions = ImportOption.DoNotIncludeTests.class)
 class DomainRulesArchTest {
 
@@ -40,4 +34,10 @@ class DomainRulesArchTest {
                     .and().arePublic()
                     .should().haveNameNotStartingWith("set")
                     .as("DOM-04: Los agregados y entidades de dominio no deben exponer setters públicos");
+
+    @ArchTest
+    static final ArchRule modules_should_not_declare_custom_exceptions =
+            noClasses().that().resideOutsideOfPackage("..shared..")
+                    .should().beAssignableTo(Throwable.class)
+                    .as("ERR-07: Prohibición absoluta de crear clases *Exception propias en módulos de negocio");
 }

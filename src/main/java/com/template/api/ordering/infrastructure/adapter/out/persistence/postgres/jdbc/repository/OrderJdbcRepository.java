@@ -11,12 +11,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
-/**
- * JDBC data access repository executing SQL queries via {@link NamedParameterJdbcTemplate}.
- * <p>
- * Conveys projected data into immutable application DTOs.
- * Conforms to OUT-04 and OUT-05.
- */
 @Repository
 @RequiredArgsConstructor
 public class OrderJdbcRepository {
@@ -24,8 +18,8 @@ public class OrderJdbcRepository {
     private final NamedParameterJdbcTemplate jdbcTemplate;
     private final OrderResultRowMapper rowMapper;
 
-    public Optional<OrderResult> findOrderResultById(UUID id) {
-        return jdbcTemplate.query(OrderJdbcQueries.SELECT_ORDER_BY_ID, Map.of("id", id), rowMapper)
+    public Optional<OrderResult> findOrderResultById(UUID orderId) {
+        return jdbcTemplate.query(OrderJdbcQueries.SELECT_ORDER_BY_ID, Map.of("id", orderId), rowMapper)
                 .stream().findFirst();
     }
 }

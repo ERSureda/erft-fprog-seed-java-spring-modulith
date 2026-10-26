@@ -18,12 +18,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.UUID;
 
-/**
- * Primary inbound HTTP REST adapter for Order resources.
- * <p>
- * Exposes endpoints for order placement and retrieval without exposing internal domain entities.
- * Conforms to INP-01, INP-02, and ADR-005.
- */
 @RestController
 @RequestMapping("/api/v1/orders")
 @RequiredArgsConstructor
@@ -39,6 +33,7 @@ public class OrderController {
     }
 
     @GetMapping("/{id}")
+    @ResponseStatus(HttpStatus.OK)
     public OrderResult getOrderById(@PathVariable UUID id) {
         return getOrderByIdUseCase.execute(new GetOrderByIdQuery(id));
     }

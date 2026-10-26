@@ -6,12 +6,6 @@ import com.template.api.shared.domain.error.ErrorCode;
 
 import java.io.Serial;
 
-/**
- * Technical exception thrown when an external HTTP client, remote service, or third-party integration fails.
- * <p>
- * Captures full diagnostic stack traces under the {@link ErrorCategory#INTERNAL} category.
- * Conforms to DOM-01 and ADR-003.
- */
 public class ExternalServiceException extends BaseException {
 
     @Serial

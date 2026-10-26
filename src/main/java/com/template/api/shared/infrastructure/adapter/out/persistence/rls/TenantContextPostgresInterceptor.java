@@ -6,12 +6,6 @@ import org.springframework.stereotype.Component;
 
 import java.util.UUID;
 
-/**
- * Hibernate StatementInspector tagging SQL statements with the active tenant context for PostgreSQL.
- * <p>
- * Ensures Row-Level Security (RLS) policies and audit logs receive tenant metadata across connection pools.
- * Conforms to SED-03.
- */
 @Component
 public class TenantContextPostgresInterceptor implements StatementInspector {
 

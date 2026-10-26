@@ -5,13 +5,6 @@ import com.template.api.shared.domain.error.ErrorCode;
 
 import java.util.Objects;
 
-/**
- * Root exception hierarchy for all domain, application, and infrastructure exceptions.
- * <p>
- * Enables zero-overhead exception handling by suppressing stack trace generation
- * when forensic diagnostics are not required by the assigned {@link ErrorCategory}.
- * Conforms to DOM-01 and ADR-003.
- */
 public abstract class BaseException extends RuntimeException {
 
     private final ErrorCode errorCode;

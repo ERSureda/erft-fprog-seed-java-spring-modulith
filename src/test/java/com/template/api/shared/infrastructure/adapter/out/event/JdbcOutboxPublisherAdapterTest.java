@@ -22,17 +22,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-/**
- * Unit tests for {@link JdbcOutboxPublisherAdapter}.
- * <p>
- * Verifies persistence of domain events into the transactional outbox table via {@link NamedParameterJdbcTemplate},
- * JSON payload serialization, null event handling, and exception translation to {@link InfrastructureException}.
- */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("JdbcOutboxPublisherAdapter Unit Tests")
 class JdbcOutboxPublisherAdapterTest {
@@ -56,8 +51,8 @@ class JdbcOutboxPublisherAdapterTest {
     }
 
     @Test
-    @DisplayName("should_PublishSingleEvent_when_Valid")
-    void should_PublishSingleEvent_when_Valid() throws Exception {
+    @DisplayName("should_publish_single_event_when_valid")
+    void should_publish_single_event_when_valid() throws Exception {
         UUID eventId = UUID.randomUUID();
         when(uuidGenerator.generateId()).thenReturn(eventId);
 
@@ -78,16 +73,40 @@ class JdbcOutboxPublisherAdapterTest {
     }
 
     @Test
-    @DisplayName("should_DoNothing_when_EventIsNull")
-    void should_DoNothing_when_EventIsNull() {
+    @DisplayName("should_publish_canonical_signature_when_schema_and_aggregate_details_provided")
+    void should_publish_canonical_signature_when_schema_and_aggregate_details_provided() throws Exception {
+        UUID eventId = UUID.randomUUID();
+        UUID aggId = UUID.randomUUID();
+        when(uuidGenerator.generateId()).thenReturn(eventId);
+
+        SampleOrderCreatedEvent event = new SampleOrderCreatedEvent(aggId.toString());
+        when(objectMapper.writeValueAsString(event)).thenReturn("{\"orderId\":\"" + aggId + "\"}");
+
+        adapter.publish("ordering", "Order", aggId, event);
+
+        ArgumentCaptor<MapSqlParameterSource> captor = ArgumentCaptor.forClass(MapSqlParameterSource.class);
+        verify(jdbcTemplate, times(1)).update(contains("INSERT INTO ordering.outbox_events"), captor.capture());
+
+        MapSqlParameterSource params = captor.getValue();
+        assertThat(params.getValue("eventId")).isEqualTo(eventId);
+        assertThat(params.getValue("aggType")).isEqualTo("Order");
+        assertThat(params.getValue("aggId")).isEqualTo(aggId.toString());
+        assertThat(params.getValue("eventType")).isEqualTo(SampleOrderCreatedEvent.class.getName());
+        assertThat(params.getValue("payload")).isEqualTo("{\"orderId\":\"" + aggId + "\"}");
+    }
+
+    @Test
+    @DisplayName("should_do_nothing_when_event_is_null")
+    void should_do_nothing_when_event_is_null() {
         adapter.publish(null);
+        adapter.publish("ordering", "Order", UUID.randomUUID(), null);
 
         verify(jdbcTemplate, never()).update(anyString(), any(MapSqlParameterSource.class));
     }
 
     @Test
-    @DisplayName("should_DoNothing_when_EventsListIsNullOrEmpty")
-    void should_DoNothing_when_EventsListIsNullOrEmpty() {
+    @DisplayName("should_do_nothing_when_events_list_is_null_or_empty")
+    void should_do_nothing_when_events_list_is_null_or_empty() {
         adapter.publishAll(null);
         adapter.publishAll(List.of());
 
@@ -95,10 +114,10 @@ class JdbcOutboxPublisherAdapterTest {
     }
 
     @Test
-    @DisplayName("should_ThrowInfrastructureException_when_SerializationFails")
-    void should_ThrowInfrastructureException_when_SerializationFails() throws Exception {
+    @DisplayName("should_throw_infrastructure_exception_when_serialization_fails")
+    void should_throw_infrastructure_exception_when_serialization_fails() throws Exception {
         SampleOrderCreatedEvent event = new SampleOrderCreatedEvent("order-123");
-        when(objectMapper.writeValueAsString(event)).thenThrow(new JsonProcessingException("Serialization failed") {});
+        when(objectMapper.writeValueAsString(event)).thenThrow(new JsonProcessingException("Serialization error") {});
 
         assertThatThrownBy(() -> adapter.publish(event))
                 .isInstanceOf(InfrastructureException.class)

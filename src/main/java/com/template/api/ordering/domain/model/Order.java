@@ -14,15 +14,9 @@ import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;
 
-/**
- * Order Aggregate Root maintaining business invariants, state transitions, and domain events.
- * <p>
- * Encapsulates the complete lifecycle of customer orders and emits events upon state mutations.
- * Enforces non-public constructors and immutable identity management.
- * Conforms to DOM-01, DOM-02, DOM-03, DOM-04, DOM-05, and TRX-02.
- */
 public class Order extends AggregateRoot<UUID> {
 
+    private final UUID tenantId;
     private final UUID customerId;
     private Money amount;
     private OrderStatus status;
@@ -32,6 +26,7 @@ public class Order extends AggregateRoot<UUID> {
     // --- Constructors & Factories ---
     private Order(
             UUID id,
+            UUID tenantId,
             UUID customerId,
             Money amount,
             OrderStatus status,
@@ -39,7 +34,8 @@ public class Order extends AggregateRoot<UUID> {
             Instant createdAt,
             Instant updatedAt
     ) {
-        super(id, version);
+        super(Objects.requireNonNull(id, "ORDER_ID_CANNOT_BE_NULL"), version);
+        this.tenantId = Objects.requireNonNull(tenantId, "ORDER_TENANT_ID_CANNOT_BE_NULL");
         this.customerId = Objects.requireNonNull(customerId, "ORDER_CUSTOMER_ID_CANNOT_BE_NULL");
         this.amount = Objects.requireNonNull(amount, "ORDER_AMOUNT_CANNOT_BE_NULL");
         this.status = Objects.requireNonNull(status, "ORDER_STATUS_CANNOT_BE_NULL");
@@ -47,9 +43,13 @@ public class Order extends AggregateRoot<UUID> {
         this.updatedAt = Objects.requireNonNull(updatedAt, "ORDER_UPDATED_AT_CANNOT_BE_NULL");
     }
 
-    public static Order create(UUID id, UUID customerId, Money amount) {
-        Instant now = Instant.now();
-        Order order = new Order(id, customerId, amount, OrderStatus.PENDING, 0L, now, now);
+    public static Order create(UUID id, UUID tenantId, UUID customerId, Money amount) {
+        return create(id, tenantId, customerId, amount, Instant.now());
+    }
+
+    public static Order create(UUID id, UUID tenantId, UUID customerId, Money amount, Instant now) {
+        Instant timestamp = Objects.requireNonNull(now, "ORDER_CREATED_AT_CANNOT_BE_NULL");
+        Order order = new Order(id, tenantId, customerId, amount, OrderStatus.PENDING, 0L, timestamp, timestamp);
         order.registerEvent(new OrderCreatedEvent(
                 id,
                 customerId,
@@ -61,6 +61,7 @@ public class Order extends AggregateRoot<UUID> {
 
     public static Order reconstruct(
             UUID id,
+            UUID tenantId,
             UUID customerId,
             Money amount,
             OrderStatus status,
@@ -68,20 +69,23 @@ public class Order extends AggregateRoot<UUID> {
             Instant createdAt,
             Instant updatedAt
     ) {
-        return new Order(id, customerId, amount, status, version, createdAt, updatedAt);
+        return new Order(id, tenantId, customerId, amount, status, version, createdAt, updatedAt);
     }
 
-    // --- Business Logic ---
     public boolean canConfirm() {
         return this.status == OrderStatus.PENDING;
     }
 
     public void confirm() {
+        confirm(Instant.now());
+    }
+
+    public void confirm(Instant now) {
         if (!canConfirm()) {
             throw new ConflictException(OrderingError.ORDERING_ORDER_INVALID_STATUS);
         }
         this.status = OrderStatus.CONFIRMED;
-        this.updatedAt = Instant.now();
+        this.updatedAt = Objects.requireNonNull(now, "ORDER_UPDATED_AT_CANNOT_BE_NULL");
         this.registerEvent(new OrderConfirmedEvent(this.id, this.customerId));
     }
 
@@ -90,11 +94,15 @@ public class Order extends AggregateRoot<UUID> {
     }
 
     public void ship() {
+        ship(Instant.now());
+    }
+
+    public void ship(Instant now) {
         if (!canShip()) {
             throw new ConflictException(OrderingError.ORDERING_ORDER_NOT_CONFIRMED);
         }
         this.status = OrderStatus.SHIPPED;
-        this.updatedAt = Instant.now();
+        this.updatedAt = Objects.requireNonNull(now, "ORDER_UPDATED_AT_CANNOT_BE_NULL");
         this.registerEvent(new OrderShippedEvent(this.id, this.customerId));
     }
 
@@ -103,15 +111,23 @@ public class Order extends AggregateRoot<UUID> {
     }
 
     public void cancel() {
+        cancel(Instant.now());
+    }
+
+    public void cancel(Instant now) {
         if (!canCancel()) {
             throw new ConflictException(OrderingError.ORDERING_ORDER_ALREADY_SHIPPED);
         }
         this.status = OrderStatus.CANCELLED;
-        this.updatedAt = Instant.now();
+        this.updatedAt = Objects.requireNonNull(now, "ORDER_UPDATED_AT_CANNOT_BE_NULL");
         this.registerEvent(new OrderCancelledEvent(this.id, this.customerId));
     }
 
     // --- Getters ---
+    public UUID getTenantId() {
+        return tenantId;
+    }
+
     public UUID getCustomerId() {
         return customerId;
     }

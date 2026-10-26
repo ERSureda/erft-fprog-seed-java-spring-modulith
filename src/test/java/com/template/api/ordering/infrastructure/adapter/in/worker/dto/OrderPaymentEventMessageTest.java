@@ -8,17 +8,12 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/**
- * Test suite for {@link OrderPaymentEventMessage}.
- * <p>
- * Verifies transformation to application command with explicit and default status values.
- */
 @DisplayName("OrderPaymentEventMessage Unit Tests")
 class OrderPaymentEventMessageTest {
 
     @Test
     @DisplayName("toCommand should map fields into ProcessOrderPaymentCommand with provided status")
-    void toCommand_withExplicitStatus_shouldMapFields() {
+    void should_map_fields_when_status_is_explicit() {
         UUID orderId = UUID.randomUUID();
         OrderPaymentEventMessage message = new OrderPaymentEventMessage(orderId, "FAILED");
 
@@ -31,7 +26,7 @@ class OrderPaymentEventMessageTest {
 
     @Test
     @DisplayName("toCommand should default paymentStatus to CONFIRMED when null")
-    void toCommand_withNullStatus_shouldDefaultToConfirmed() {
+    void should_default_status_to_confirmed_when_status_is_null() {
         UUID orderId = UUID.randomUUID();
         OrderPaymentEventMessage message = new OrderPaymentEventMessage(orderId, null);
 
@@ -40,5 +35,20 @@ class OrderPaymentEventMessageTest {
         assertThat(command).isNotNull();
         assertThat(command.orderId()).isEqualTo(orderId);
         assertThat(command.paymentStatus()).isEqualTo("CONFIRMED");
+    }
+
+    @Test
+    @DisplayName("canonical constructor should preserve tenantId and correlationId metadata")
+    void should_preserve_tenant_and_correlation_metadata_when_canonical_constructor_used() {
+        UUID orderId = UUID.randomUUID();
+        UUID tenantId = UUID.randomUUID();
+        OrderPaymentEventMessage message = new OrderPaymentEventMessage(
+                orderId, "CONFIRMED", tenantId, "corr-123"
+        );
+
+        assertThat(message.orderId()).isEqualTo(orderId);
+        assertThat(message.paymentStatus()).isEqualTo("CONFIRMED");
+        assertThat(message.tenantId()).isEqualTo(tenantId);
+        assertThat(message.correlationId()).isEqualTo("corr-123");
     }
 }

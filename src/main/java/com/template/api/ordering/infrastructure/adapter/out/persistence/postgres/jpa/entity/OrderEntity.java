@@ -15,12 +15,6 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 
-/**
- * JPA entity representing persisted order state within the PostgreSQL database schema.
- * <p>
- * Confined strictly to the JPA persistence adapter package.
- * Conforms to OUT-01 and TRX-02.
- */
 @Entity
 @Table(name = "orders", schema = "ordering")
 @Getter
@@ -32,6 +26,9 @@ public class OrderEntity {
     @Id
     @Column(name = "id", nullable = false)
     private UUID id;
+
+    @Column(name = "tenant_id", nullable = false)
+    private UUID tenantId;
 
     @Column(name = "customer_id", nullable = false)
     private UUID customerId;
@@ -54,4 +51,7 @@ public class OrderEntity {
 
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
+
+    @Column(name = "deleted_at")
+    private Instant deletedAt;
 }

@@ -7,12 +7,6 @@ import com.template.api.shared.domain.error.FieldViolation;
 
 import java.util.List;
 
-/**
- * Domain exception thrown when business invariants, attribute constraints, or contracts are violated.
- * <p>
- * Encapsulates granular {@link FieldViolation} items and maps to HTTP 400 Bad Request.
- * Conforms to DOM-01 and ADR-003.
- */
 public class ValidationException extends BaseException {
 
     private final List<FieldViolation> violations;

@@ -11,11 +11,6 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/**
- * Unit tests for {@link TenantContextPostgresInterceptor}.
- * <p>
- * Verifies SQL statement inspection and injection of tenant session comment prefixes for row-level security (RLS) enforcement.
- */
 @DisplayName("TenantContextPostgresInterceptor Unit Tests")
 class TenantContextPostgresInterceptorTest {
 
@@ -28,7 +23,7 @@ class TenantContextPostgresInterceptorTest {
 
     @Test
     @DisplayName("Should inject tenant comment prefix when tenant context is present")
-    void inspect_withTenantContext_shouldAddComment() {
+    void should_inject_tenant_comment_when_tenant_context_is_present() {
         UUID tenantId = UUID.randomUUID();
         ExecutionContextHolder.set(new ExecutionContext(tenantId, UUID.randomUUID(), Set.of("USER")));
 
@@ -41,7 +36,7 @@ class TenantContextPostgresInterceptorTest {
 
     @Test
     @DisplayName("Should leave SQL unchanged when no tenant is bound to context")
-    void inspect_withoutTenant_shouldReturnOriginalSql() {
+    void should_leave_sql_unchanged_when_no_tenant_in_context() {
         ExecutionContextHolder.set(ExecutionContext.anonymous());
         String sql = "SELECT * FROM orders";
 
@@ -52,7 +47,7 @@ class TenantContextPostgresInterceptorTest {
 
     @Test
     @DisplayName("Should leave SQL unchanged when it already specifies tenant session variable")
-    void inspect_whenAlreadyHasTenantVariable_shouldReturnOriginal() {
+    void should_leave_sql_unchanged_when_already_has_tenant_variable() {
         UUID tenantId = UUID.randomUUID();
         ExecutionContextHolder.set(new ExecutionContext(tenantId, UUID.randomUUID(), Set.of("USER")));
         String sql = "SET LOCAL app.current_tenant_id = '123'; SELECT * FROM orders";
@@ -64,7 +59,7 @@ class TenantContextPostgresInterceptorTest {
 
     @Test
     @DisplayName("Should return null safely when input SQL is null")
-    void inspect_nullSql_shouldReturnNull() {
+    void should_return_null_when_sql_is_null() {
         assertThat(interceptor.inspect(null)).isNull();
     }
 }

@@ -4,23 +4,26 @@ import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
 
-/**
- * Minimalist immutable container for cursor-based (keyset) paginated query results.
- * <p>
- * Encapsulates an item window and an opaque cursor pointer for subsequent window retrieval without offset degradation.
- * Conforms to SED-01.
- *
- * @param items      immutable list of elements present in the current window
- * @param nextCursor opaque pointer to fetch the subsequent window, or null if no further records exist
- * @param <T>        type of elements contained in the result
- */
 public record CursorResult<T>(
         List<T> items,
-        String nextCursor
+        String nextCursor,
+        boolean hasNext
 ) {
 
     public CursorResult {
         items = (items == null || items.isEmpty()) ? List.of() : List.copyOf(items);
+    }
+
+    public CursorResult(List<T> items, String nextCursor) {
+        this(items, nextCursor, nextCursor != null && !nextCursor.isBlank());
+    }
+
+    public static <T> CursorResult<T> of(List<T> items, String nextCursor) {
+        return new CursorResult<>(items, nextCursor);
+    }
+
+    public static <T> CursorResult<T> of(List<T> items, String nextCursor, boolean hasNext) {
+        return new CursorResult<>(items, nextCursor, hasNext);
     }
 
     public static <T> CursorResult<T> of(
@@ -29,7 +32,7 @@ public record CursorResult<T>(
             Function<? super T, String> cursorExtractor
     ) {
         if (itemsWithExtra == null || itemsWithExtra.isEmpty() || limit <= 0) {
-            return new CursorResult<>(List.of(), null);
+            return new CursorResult<>(List.of(), null, false);
         }
         Objects.requireNonNull(cursorExtractor, "cursorExtractor cannot be null");
 
@@ -37,14 +40,14 @@ public record CursorResult<T>(
         List<T> content = hasMore ? itemsWithExtra.subList(0, limit) : itemsWithExtra;
         String nextCursor = hasMore ? cursorExtractor.apply(content.get(content.size() - 1)) : null;
 
-        return new CursorResult<>(content, nextCursor);
+        return new CursorResult<>(content, nextCursor, hasMore);
     }
 
     public <U> CursorResult<U> map(Function<? super T, U> mapper) {
         Objects.requireNonNull(mapper, "mapper cannot be null");
         if (items.isEmpty()) {
-            return new CursorResult<>(List.of(), nextCursor);
+            return new CursorResult<>(List.of(), nextCursor, hasNext);
         }
-        return new CursorResult<>(items.stream().map(mapper).toList(), nextCursor);
+        return new CursorResult<>(items.stream().map(mapper).toList(), nextCursor, hasNext);
     }
 }

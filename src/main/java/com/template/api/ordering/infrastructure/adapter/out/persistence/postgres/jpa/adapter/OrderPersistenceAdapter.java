@@ -6,18 +6,13 @@ import com.template.api.ordering.infrastructure.adapter.out.persistence.postgres
 import com.template.api.ordering.infrastructure.adapter.out.persistence.postgres.jpa.mapper.OrderPersistenceMapper;
 import com.template.api.ordering.infrastructure.adapter.out.persistence.postgres.jpa.repository.OrderJpaRepository;
 import com.template.api.shared.application.port.out.OutboxPublisherPort;
+import com.template.api.shared.domain.event.DomainEvent;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.util.Optional;
 import java.util.UUID;
 
-/**
- * Secondary outbound persistence adapter implementing {@link OrderRepositoryPort} using Spring Data JPA.
- * <p>
- * Manages JPA entity transactions and atomically publishes domain events via {@link OutboxPublisherPort}.
- * Conforms to OUT-01, TRX-02, and TRX-03.
- */
 @Component
 @RequiredArgsConstructor
 public class OrderPersistenceAdapter implements OrderRepositoryPort {
@@ -35,7 +30,9 @@ public class OrderPersistenceAdapter implements OrderRepositoryPort {
     public Order save(Order order) {
         OrderEntity saved = orderJpaRepository.save(orderPersistenceMapper.toEntity(order));
         if (order.hasDomainEvents()) {
-            outboxPublisherPort.publishAll(order.pullDomainEvents());
+            for (DomainEvent event : order.pullDomainEvents()) {
+                outboxPublisherPort.publish("ordering", "Order", order.getId(), event);
+            }
         }
         return orderPersistenceMapper.toDomain(saved);
     }

@@ -18,25 +18,20 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/**
- * Test suite for platform error contracts and zero-overhead domain exceptions.
- * <p>
- * Verifies error code catalogs, diagnostic stack trace suppression, and field violation encapsulations.
- */
 @DisplayName("Domain Errors and Exceptions Unit Tests")
 class DomainErrorsAndExceptionsTest {
 
     @ParameterizedTest
     @EnumSource(CommonError.class)
     @DisplayName("CommonError codes should match enum constant names")
-    void commonErrorCodeMatchesName(CommonError error) {
+    void should_match_enum_name_when_common_error_code_inspected(CommonError error) {
         assertThat(error.code()).isEqualTo(error.name());
     }
 
     @ParameterizedTest
     @EnumSource(CommonError.class)
     @DisplayName("CommonError codes should adhere to standard UPPER_SNAKE_CASE pattern")
-    void commonErrorCodeFollowsStandardPattern(CommonError error) {
+    void should_follow_standard_pattern_when_common_error_code_inspected(CommonError error) {
         assertThat(error.code())
                 .doesNotStartWith("GLOBAL_")
                 .matches("^[A-Z]+(_[A-Z]+)*$");
@@ -44,7 +39,7 @@ class DomainErrorsAndExceptionsTest {
 
     @Test
     @DisplayName("ErrorCategory should correctly flag diagnostic capture")
-    void errorCategory_capturesDiagnostics() {
+    void should_flag_diagnostic_capture_when_category_inspected() {
         assertThat(ErrorCategory.VALIDATION.capturesDiagnostics()).isFalse();
         assertThat(ErrorCategory.NOT_FOUND.capturesDiagnostics()).isFalse();
         assertThat(ErrorCategory.CONFLICT.capturesDiagnostics()).isFalse();
@@ -55,7 +50,7 @@ class DomainErrorsAndExceptionsTest {
 
     @Test
     @DisplayName("FieldViolation record should store and expose field and message")
-    void fieldViolation_attributes() {
+    void should_expose_attributes_when_field_violation_created() {
         FieldViolation violation = new FieldViolation("email", "must be a valid email address");
 
         assertThat(violation.field()).isEqualTo("email");
@@ -64,7 +59,7 @@ class DomainErrorsAndExceptionsTest {
 
     @Test
     @DisplayName("Business exceptions should suppress stack traces for zero overhead")
-    void businessExceptions_shouldSuppressStackTrace() {
+    void should_suppress_stack_trace_when_business_exceptions_thrown() {
         ResourceNotFoundException notFound = new ResourceNotFoundException("Not found");
         ConflictException conflict = new ConflictException("Conflict");
         ValidationException validation = new ValidationException("Invalid");
@@ -90,7 +85,7 @@ class DomainErrorsAndExceptionsTest {
 
     @Test
     @DisplayName("Infrastructure and External exceptions should retain diagnostic stack traces")
-    void technicalExceptions_shouldCaptureStackTrace() {
+    void should_capture_stack_trace_when_technical_exceptions_thrown() {
         InfrastructureException infra = new InfrastructureException("DB down");
         ExternalServiceException ext = new ExternalServiceException(CommonError.INTERNAL_SERVER_ERROR, "HTTP timeout", new RuntimeException());
 
@@ -104,7 +99,7 @@ class DomainErrorsAndExceptionsTest {
 
     @Test
     @DisplayName("ValidationException should expose field violations defensively copied")
-    void validationException_violationsHandling() {
+    void should_handle_violations_defensively_when_validation_exception_created() {
         FieldViolation v1 = new FieldViolation("field1", "error1");
         FieldViolation v2 = new FieldViolation("field2", "error2");
 
@@ -118,7 +113,7 @@ class DomainErrorsAndExceptionsTest {
 
     @Test
     @DisplayName("ResourceNotFoundException should format entity class and id properly")
-    void resourceNotFoundException_entityFormatting() {
+    void should_format_entity_and_id_when_resource_not_found_exception_created() {
         ResourceNotFoundException ex = new ResourceNotFoundException(String.class, "abc-123");
 
         assertThat(ex.getMessage()).isEqualTo("Resource 'String' with id 'abc-123' not found");
@@ -127,7 +122,7 @@ class DomainErrorsAndExceptionsTest {
 
     @Test
     @DisplayName("BaseException constructor should fallback to errorCode code when message is blank")
-    void baseException_fallbackMessage() {
+    void should_fallback_to_error_code_when_message_is_blank() {
         BaseException ex = new ConflictException(CommonError.RESOURCE_CONFLICT, "   ");
 
         assertThat(ex.getMessage()).isEqualTo(CommonError.RESOURCE_CONFLICT.code());
@@ -135,7 +130,7 @@ class DomainErrorsAndExceptionsTest {
 
     @Test
     @DisplayName("BaseException should reject null category and null errorCode")
-    void baseException_nullChecks() {
+    void should_reject_null_category_or_error_code_when_base_exception_created() {
         assertThatThrownBy(() -> new BaseException(null, ErrorCategory.CONFLICT, "msg") {})
                 .isInstanceOf(NullPointerException.class);
 

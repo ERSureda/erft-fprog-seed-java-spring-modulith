@@ -9,17 +9,12 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/**
- * Test suite for {@link PageResult}.
- * <p>
- * Verifies offset pagination calculations, page boundary properties, and immutability.
- */
 @DisplayName("PageResult Unit Tests")
 class PageResultTest {
 
     @Test
     @DisplayName("Should correctly calculate totalPages using of factory method")
-    void of_withValidData_shouldCalculateTotalPagesCorrectly() {
+    void should_calculate_total_pages_correctly_when_valid_data_provided() {
         PageResult<String> page1 = PageResult.of(List.of("a", "b"), 0, 10, 25);
         PageResult<String> page2 = PageResult.of(List.of("a"), 1, 10, 20);
         PageResult<String> page3 = PageResult.of(List.of(), 0, 10, 0);
@@ -38,7 +33,7 @@ class PageResultTest {
 
     @Test
     @DisplayName("Should ensure items list is unmodifiable and null items default to empty list")
-    void immutability_itemsShouldBeUnmodifiable() {
+    void should_defend_immutability_when_items_list_accessed() {
         List<String> mutableList = new ArrayList<>();
         mutableList.add("item1");
 
@@ -55,7 +50,7 @@ class PageResultTest {
 
     @Test
     @DisplayName("Should map items preserving pagination metadata")
-    void map_shouldTransformElementsPreservingMetadata() {
+    void should_preserve_metadata_when_mapping_elements() {
         PageResult<Integer> numbers = PageResult.of(List.of(1, 2, 3), 1, 3, 10);
 
         PageResult<String> mapped = numbers.map(n -> "Value: " + n);
@@ -69,7 +64,7 @@ class PageResultTest {
 
     @Test
     @DisplayName("Should return empty items when mapping an empty PageResult")
-    void map_withEmptyItems_shouldReturnEmptyResult() {
+    void should_return_empty_result_when_mapping_empty_items() {
         PageResult<Integer> empty = PageResult.of(List.of(), 0, 10, 0);
 
         PageResult<String> mapped = empty.map(Object::toString);
@@ -80,7 +75,7 @@ class PageResultTest {
 
     @Test
     @DisplayName("Should reject null mapper function")
-    void map_withNullMapper_shouldThrowNullPointerException() {
+    void should_throw_null_pointer_exception_when_mapper_is_null() {
         PageResult<Integer> numbers = PageResult.of(List.of(1), 0, 10, 1);
 
         assertThatThrownBy(() -> numbers.map(null))

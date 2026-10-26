@@ -32,12 +32,6 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.BDDMockito.given;
 
-/**
- * Unit tests for {@link GlobalExceptionHandler}.
- * <p>
- * Verifies translation of domain exceptions, bean validation failures, unhandled throwables, and Spring ProblemDetail
- * instances into RFC 7807-compliant {@link ErrorResponse} DTOs with internal detail masking (OUT-01).
- */
 @DisplayName("GlobalExceptionHandler Unit Tests")
 class GlobalExceptionHandlerTest {
 
@@ -59,7 +53,7 @@ class GlobalExceptionHandlerTest {
 
         @Test
         @DisplayName("Should transform ResourceNotFoundException to ErrorResponse 404")
-        void shouldHandleResourceNotFoundException() {
+        void should_transform_resource_not_found_exception_when_handled() {
             ResourceNotFoundException ex = new ResourceNotFoundException("Customer with ID 123 not found");
 
             ResponseEntity<ErrorResponse> response = handler.handleBaseException(ex);
@@ -74,7 +68,7 @@ class GlobalExceptionHandlerTest {
 
         @Test
         @DisplayName("Should transform ConflictException to ErrorResponse 409")
-        void shouldHandleConflictException() {
+        void should_transform_conflict_exception_when_handled() {
             ConflictException ex = new ConflictException("Email already registered");
 
             ResponseEntity<ErrorResponse> response = handler.handleBaseException(ex);
@@ -89,7 +83,7 @@ class GlobalExceptionHandlerTest {
 
         @Test
         @DisplayName("Should transform simple ValidationException to ErrorResponse 400 without violations")
-        void shouldHandleSimpleValidationException() {
+        void should_transform_simple_validation_exception_when_handled() {
             ValidationException ex = new ValidationException("Invalid price amount");
 
             ResponseEntity<ErrorResponse> response = handler.handleBaseException(ex);
@@ -104,7 +98,7 @@ class GlobalExceptionHandlerTest {
 
         @Test
         @DisplayName("Should transform ValidationException with violations to ErrorResponse 400 with errors populated")
-        void shouldHandleValidationExceptionWithMultipleViolations() {
+        void should_transform_validation_exception_with_violations_when_handled() {
             List<FieldViolation> violations = List.of(
                     new FieldViolation("username", "Username already taken"),
                     new FieldViolation("age", "Age must be at least 18")
@@ -124,7 +118,7 @@ class GlobalExceptionHandlerTest {
 
         @Test
         @DisplayName("Should transform ForbiddenException to ErrorResponse 403")
-        void shouldHandleForbiddenException() {
+        void should_transform_forbidden_exception_when_handled() {
             ForbiddenException ex = new ForbiddenException("Access denied to tenant");
 
             ResponseEntity<ErrorResponse> response = handler.handleBaseException(ex);
@@ -137,7 +131,7 @@ class GlobalExceptionHandlerTest {
 
         @Test
         @DisplayName("Should transform UnauthenticatedException to ErrorResponse 401")
-        void shouldHandleUnauthenticatedException() {
+        void should_transform_unauthenticated_exception_when_handled() {
             UnauthenticatedException ex = new UnauthenticatedException("Token expired");
 
             ResponseEntity<ErrorResponse> response = handler.handleBaseException(ex);
@@ -150,7 +144,7 @@ class GlobalExceptionHandlerTest {
 
         @Test
         @DisplayName("Should mask details for INTERNAL category exceptions (InfrastructureException)")
-        void shouldMaskInternalExceptions() {
+        void should_mask_internal_exceptions_when_handled() {
             InfrastructureException ex = new InfrastructureException("Database connection timeout on pool");
 
             ResponseEntity<ErrorResponse> response = handler.handleBaseException(ex);
@@ -170,7 +164,7 @@ class GlobalExceptionHandlerTest {
 
         @Test
         @DisplayName("Should transform MethodArgumentNotValidException into ErrorResponse 400 with FieldViolations")
-        void shouldHandleMethodArgumentNotValidException() {
+        void should_transform_method_argument_not_valid_when_handled() {
             MethodParameter parameter = new MethodParameter(DUMMY_METHOD, 0);
 
             DummyDto target = new DummyDto(null, -5);
@@ -207,7 +201,7 @@ class GlobalExceptionHandlerTest {
 
         @Test
         @DisplayName("Should transform ConstraintViolationException into ErrorResponse 400 with FieldViolations")
-        void shouldHandleConstraintViolationException() {
+        void should_transform_constraint_violation_exception_when_handled() {
             @SuppressWarnings("unchecked")
             ConstraintViolation<Object> violation = Mockito.mock(ConstraintViolation.class);
             Path mockPath = Mockito.mock(Path.class);
@@ -236,7 +230,7 @@ class GlobalExceptionHandlerTest {
 
         @Test
         @DisplayName("Should intercept unexpected Throwable and return masked 500 ErrorResponse")
-        void shouldHandleUnexpectedThrowable() {
+        void should_return_masked_500_when_unexpected_throwable_handled() {
             NullPointerException ex = new NullPointerException("Null pointer at Line 42");
 
             ResponseEntity<ErrorResponse> response = handler.handleUnhandled(ex);
@@ -256,7 +250,7 @@ class GlobalExceptionHandlerTest {
 
         @Test
         @DisplayName("Should pass through ErrorResponse bodies unmodified")
-        void shouldPassThroughErrorResponseBody() {
+        void should_pass_through_error_response_body_when_already_error_response() {
             ErrorResponse original = new ErrorResponse(400, "CUSTOM_CODE", "Detail message");
 
             ResponseEntity<Object> response = handler.createResponseEntity(
@@ -272,7 +266,7 @@ class GlobalExceptionHandlerTest {
 
         @Test
         @DisplayName("Should convert Spring ProblemDetail to ErrorResponse")
-        void shouldConvertProblemDetailToErrorResponse() {
+        void should_convert_problem_detail_to_error_response_when_handled() {
             ProblemDetail problem = ProblemDetail.forStatusAndDetail(
                     HttpStatus.NOT_FOUND,
                     "No endpoint GET /api/v1/unknown found"
@@ -297,7 +291,7 @@ class GlobalExceptionHandlerTest {
 
         @Test
         @DisplayName("Should fallback to status code string when body has no detail")
-        void shouldFallbackToStatusCodeString() {
+        void should_fallback_to_status_code_string_when_body_has_no_detail() {
             ResponseEntity<Object> response = handler.createResponseEntity(
                     "Raw string error",
                     new HttpHeaders(),

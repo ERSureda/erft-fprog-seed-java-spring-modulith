@@ -2,14 +2,12 @@ package com.template.api;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.scheduling.annotation.EnableScheduling;
+import org.springframework.transaction.annotation.EnableTransactionManagement;
 
-/**
- * Main application entry point for the Modular Monolith API.
- * <p>
- * Bootstraps the Spring Boot runtime environment, initializes the Spring Modulith
- * container, and configures cross-cutting infrastructure beans.
- */
 @SpringBootApplication
+@EnableScheduling
+@EnableTransactionManagement(order = 0)
 public class ApiApplication {
 
     public static void main(String[] args) {

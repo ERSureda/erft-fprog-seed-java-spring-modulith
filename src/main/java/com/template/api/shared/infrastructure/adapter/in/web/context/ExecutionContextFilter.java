@@ -21,13 +21,6 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
 
-/**
- * Perimeter HTTP filter extracting caller context metadata from gateway headers.
- * <p>
- * Reconstructs the immutable {@link ExecutionContext} (tenant, user, roles, and correlationId),
- * binding it to thread-local storage and logging MDC with guaranteed cleanup in {@code finally}.
- * Conforms to SED-03.
- */
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE + 10)
 public class ExecutionContextFilter extends OncePerRequestFilter {

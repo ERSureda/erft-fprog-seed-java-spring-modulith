@@ -11,21 +11,12 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/**
- * Test suite for {@link AggregateRoot}.
- * <p>
- * Verifies version tracking, event buffer recording, and atomic event draining.
- */
 @DisplayName("AggregateRoot Unit Tests")
 class AggregateRootTest {
 
     record DummyEvent(UUID eventId, String aggregateId, Instant occurredAt, String eventType) implements DomainEvent {}
 
     static class TestAggregate extends AggregateRoot<UUID> {
-        TestAggregate() {
-            super();
-        }
-
         TestAggregate(UUID id) {
             super(id);
         }
@@ -41,16 +32,13 @@ class AggregateRootTest {
 
     @Test
     @DisplayName("Should detect if entity is new based on version")
-    void isNew_shouldCheckVersion() {
-        TestAggregate newAggregate = new TestAggregate();
+    void should_detect_version_state_when_aggregate_is_inspected() {
         TestAggregate withIdOnly = new TestAggregate(UUID.randomUUID());
         TestAggregate persisted = new TestAggregate(UUID.randomUUID(), 0L);
 
-        assertThat(newAggregate.getVersion()).isNull();
-        assertThat(newAggregate.version()).isNull();
-
         assertThat(withIdOnly.id()).isNotNull();
         assertThat(withIdOnly.version()).isNull();
+        assertThat(withIdOnly.getVersion()).isNull();
 
         assertThat(persisted.getVersion()).isEqualTo(0L);
         assertThat(persisted.version()).isEqualTo(0L);
@@ -58,7 +46,7 @@ class AggregateRootTest {
 
     @Test
     @DisplayName("Should lazily handle domain events and clear memory on pull")
-    void lazyEvents_andPullDomainEvents() {
+    void should_drain_events_atomically_when_pull_domain_events_called() {
         TestAggregate aggregate = new TestAggregate(UUID.randomUUID(), 1L);
 
         assertThat(aggregate.hasDomainEvents()).isFalse();
@@ -78,8 +66,8 @@ class AggregateRootTest {
 
     @Test
     @DisplayName("Should throw NullPointerException when registering null event")
-    void registerNullEvent_shouldThrow() {
-        TestAggregate aggregate = new TestAggregate();
+    void should_throw_null_pointer_exception_when_registering_null_event() {
+        TestAggregate aggregate = new TestAggregate(UUID.randomUUID());
 
         assertThatThrownBy(() -> aggregate.registerEvent(null))
                 .isInstanceOf(NullPointerException.class)

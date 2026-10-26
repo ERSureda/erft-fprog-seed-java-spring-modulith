@@ -35,5 +35,6 @@ management:
       show-details: when_authorized
 
 outbox:
+  schemas: public,ordering
   poll-interval-ms: 1000
   purge-cron: "0 0 3 * * ?"

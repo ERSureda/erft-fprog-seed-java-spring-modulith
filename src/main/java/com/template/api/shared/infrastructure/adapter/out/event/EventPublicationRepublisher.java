@@ -12,12 +12,6 @@ import org.springframework.stereotype.Component;
 import java.time.Duration;
 import java.util.Objects;
 
-/**
- * Scheduled recovery worker for incomplete Spring Modulith transactional event publications.
- * <p>
- * Inspects the publication registry and resubmits uncompleted events exceeding the stale threshold.
- * Conforms to ARC-02 and TRX-03.
- */
 @Component
 @ConditionalOnClass(IncompleteEventPublications.class)
 @ConditionalOnBean(IncompleteEventPublications.class)

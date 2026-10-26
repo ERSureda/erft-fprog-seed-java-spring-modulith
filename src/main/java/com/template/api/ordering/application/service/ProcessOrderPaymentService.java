@@ -3,41 +3,37 @@ package com.template.api.ordering.application.service;
 import com.template.api.ordering.application.command.ProcessOrderPaymentCommand;
 import com.template.api.ordering.application.port.in.ProcessOrderPaymentUseCase;
 import com.template.api.ordering.application.port.out.OrderRepositoryPort;
+import com.template.api.ordering.domain.OrderingError;
 import com.template.api.ordering.domain.model.Order;
+import com.template.api.shared.application.port.out.UtcClockPort;
+import com.template.api.shared.domain.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Application service orchestrating payment confirmation updates from asynchronous workers.
- * <p>
- * Rehydrates the Order aggregate root, invokes domain state transitions, and persists mutations atomically.
- * Conforms to APP-01, APP-02, and TRX-01.
- */
-@Slf4j
+import java.time.Instant;
+
 @Service
 @RequiredArgsConstructor
 public class ProcessOrderPaymentService implements ProcessOrderPaymentUseCase {
 
     private final OrderRepositoryPort orderRepository;
+    private final UtcClockPort utcClockPort;
 
     @Override
     @Transactional
     public void execute(ProcessOrderPaymentCommand command) {
-        Order order = orderRepository.findById(command.orderId()).orElse(null);
-        if (order == null) {
-            log.warn("Order [{}] not found for payment processing; event will be discarded", command.orderId());
-            return;
-        }
+        Order order = orderRepository.findById(command.orderId())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        OrderingError.ORDERING_ORDER_NOT_FOUND,
+                        Order.class,
+                        command.orderId()
+                ));
 
         if ("CONFIRMED".equalsIgnoreCase(command.paymentStatus())) {
-            order.confirm();
+            Instant now = utcClockPort.now();
+            order.confirm(now);
             orderRepository.save(order);
-            log.info("Order [{}] successfully confirmed following payment event", command.orderId());
-        } else {
-            log.warn("Order [{}] payment status [{}] is not confirmed; skipping transition",
-                    command.orderId(), command.paymentStatus());
         }
     }
 }

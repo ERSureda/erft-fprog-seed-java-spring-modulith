@@ -7,13 +7,6 @@ import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicLong;
 
-/**
- * High-performance UUIDv7 generator implementation compliant with RFC 9562.
- * <p>
- * Combines a 48-bit Unix millisecond epoch timestamp with a 12-bit monotonic sub-millisecond counter
- * inside a single atomic register. Enforces non-blocking thread-safety via lock-free CAS operations.
- * Conforms to SED-02.
- */
 @Component
 public final class UuidGeneratorAdapter implements UuidGeneratorPort {
 

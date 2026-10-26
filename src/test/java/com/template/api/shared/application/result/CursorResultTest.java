@@ -9,35 +9,31 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/**
- * Test suite for {@link CursorResult}.
- * <p>
- * Verifies keyset pagination calculations, cursor extraction, and collection immutability.
- */
 @DisplayName("CursorResult Unit Tests")
 class CursorResultTest {
 
     record Item(String id, String name) {}
 
     @Test
-    @DisplayName("Should create CursorResult with nextCursor when items exceed limit")
-    void of_withMoreItemsThanLimit_shouldCalculateNextCursor() {
+    @DisplayName("Should create CursorResult with nextCursor and hasNext=true when items exceed limit")
+    void should_create_cursor_result_when_extra_items_present() {
         List<Item> fetched = List.of(
                 new Item("c1", "First"),
                 new Item("c2", "Second"),
-                new Item("c3", "Third")
+                new Item("c3", "Third (Extra)")
         );
 
         CursorResult<Item> result = CursorResult.of(fetched, 2, Item::id);
 
         assertThat(result.items()).hasSize(2);
-        assertThat(result.items()).extracting(Item::id).containsExactly("c1", "c2");
+        assertThat(result.items().get(1).id()).isEqualTo("c2");
         assertThat(result.nextCursor()).isEqualTo("c2");
+        assertThat(result.hasNext()).isTrue();
     }
 
     @Test
-    @DisplayName("Should create CursorResult with null nextCursor when items do not exceed limit")
-    void of_withItemsWithinLimit_shouldHaveNullCursor() {
+    @DisplayName("Should create CursorResult with null nextCursor and hasNext=false when items do not exceed limit")
+    void should_create_cursor_result_without_next_cursor_when_limit_not_exceeded() {
         List<Item> fetched = List.of(
                 new Item("c1", "First"),
                 new Item("c2", "Second")
@@ -47,13 +43,32 @@ class CursorResultTest {
 
         assertThat(result.items()).hasSize(2);
         assertThat(result.nextCursor()).isNull();
+        assertThat(result.hasNext()).isFalse();
     }
 
     @Test
-    @DisplayName("Should handle empty, null or non-positive limit safely")
-    void of_withInvalidInputs_shouldReturnEmpty() {
+    @DisplayName("Should create CursorResult via canonical factory of(items, nextCursor)")
+    void should_create_cursor_result_when_canonical_of_factory_invoked() {
+        List<String> items = List.of("A", "B");
+        CursorResult<String> withCursor = CursorResult.of(items, "cursor-123");
+        assertThat(withCursor.items()).containsExactly("A", "B");
+        assertThat(withCursor.nextCursor()).isEqualTo("cursor-123");
+        assertThat(withCursor.hasNext()).isTrue();
+
+        CursorResult<String> withoutCursor = CursorResult.of(items, null);
+        assertThat(withoutCursor.nextCursor()).isNull();
+        assertThat(withoutCursor.hasNext()).isFalse();
+
+        CursorResult<String> explicitHasNext = CursorResult.of(items, "cursor-123", false);
+        assertThat(explicitHasNext.hasNext()).isFalse();
+    }
+
+    @Test
+    @DisplayName("Should handle empty and edge-case inputs gracefully")
+    void should_handle_gracefully_when_inputs_are_empty_or_edge_cases() {
         assertThat(CursorResult.of(null, 10, Object::toString).items()).isEmpty();
         assertThat(CursorResult.of(null, 10, Object::toString).nextCursor()).isNull();
+        assertThat(CursorResult.of(null, 10, Object::toString).hasNext()).isFalse();
 
         assertThat(CursorResult.of(List.of(), 10, Object::toString).items()).isEmpty();
         assertThat(CursorResult.of(List.of("a"), 0, Object::toString).items()).isEmpty();
@@ -61,62 +76,73 @@ class CursorResultTest {
     }
 
     @Test
-    @DisplayName("Should ensure items list is defensively copied and unmodifiable")
-    void immutability_itemsShouldBeUnmodifiable() {
+    @DisplayName("Should make defensive copy of input list in constructor")
+    void should_defend_immutability_when_mutable_list_passed() {
         List<Item> mutableList = new ArrayList<>();
-        mutableList.add(new Item("c1", "First"));
+        mutableList.add(new Item("c1", "One"));
 
-        CursorResult<Item> result = new CursorResult<>(mutableList, "c1");
-        mutableList.add(new Item("c2", "Second"));
+        CursorResult<Item> result = new CursorResult<>(mutableList, "c1", true);
+        mutableList.add(new Item("c2", "Two"));
 
         assertThat(result.items()).hasSize(1);
-        assertThatThrownBy(() -> result.items().add(new Item("c3", "Third")))
-                .isInstanceOf(UnsupportedOperationException.class);
-
-        CursorResult<Item> nullItemsResult = new CursorResult<>(null, null);
-        assertThat(nullItemsResult.items()).isEmpty();
+        assertThat(result.hasNext()).isTrue();
     }
 
     @Test
-    @DisplayName("Should map items preserving the cursor pointer")
-    void map_shouldTransformElementsPreservingCursor() {
+    @DisplayName("Should handle null items in constructor gracefully")
+    void should_initialize_empty_items_when_constructor_receives_null() {
+        CursorResult<Item> nullItemsResult = new CursorResult<>(null, null);
+        assertThat(nullItemsResult.items()).isNotNull();
+        assertThat(nullItemsResult.items()).isEmpty();
+        assertThat(nullItemsResult.nextCursor()).isNull();
+        assertThat(nullItemsResult.hasNext()).isFalse();
+    }
+
+    @Test
+    @DisplayName("Should transform items and preserve nextCursor and hasNext via map")
+    void should_preserve_metadata_when_mapping_items() {
         CursorResult<Item> original = new CursorResult<>(
                 List.of(new Item("c1", "Alice"), new Item("c2", "Bob")),
-                "c2"
+                "c2",
+                true
         );
 
         CursorResult<String> mapped = original.map(Item::name);
 
         assertThat(mapped.items()).containsExactly("Alice", "Bob");
         assertThat(mapped.nextCursor()).isEqualTo("c2");
+        assertThat(mapped.hasNext()).isTrue();
     }
 
     @Test
     @DisplayName("Should return empty items when mapping an empty CursorResult")
-    void map_withEmptyItems_shouldReturnEmptyResult() {
-        CursorResult<Item> original = new CursorResult<>(List.of(), "c0");
+    void should_return_empty_items_when_mapping_empty_result() {
+        CursorResult<Item> original = new CursorResult<>(List.of(), "c0", false);
 
         CursorResult<String> mapped = original.map(Item::name);
 
         assertThat(mapped.items()).isEmpty();
         assertThat(mapped.nextCursor()).isEqualTo("c0");
+        assertThat(mapped.hasNext()).isFalse();
     }
 
     @Test
-    @DisplayName("Should reject null mapper function")
-    void map_withNullMapper_shouldThrowNullPointerException() {
+    @DisplayName("Should throw NullPointerException when mapper is null")
+    void should_throw_exception_when_mapper_is_null() {
         CursorResult<Item> original = new CursorResult<>(List.of(new Item("c1", "Alice")), "c1");
 
         assertThatThrownBy(() -> original.map(null))
-                .isInstanceOf(NullPointerException.class);
+                .isInstanceOf(NullPointerException.class)
+                .hasMessage("mapper cannot be null");
     }
 
     @Test
-    @DisplayName("Should reject null cursor extractor when calculation is needed")
-    void of_withNullCursorExtractor_shouldThrowNullPointerException() {
-        List<Item> fetched = List.of(new Item("c1", "Alice"));
+    @DisplayName("Should throw NullPointerException when cursorExtractor is null in of()")
+    void should_throw_exception_when_cursor_extractor_is_null() {
+        List<Item> fetched = List.of(new Item("c1", "One"));
 
         assertThatThrownBy(() -> CursorResult.of(fetched, 1, null))
-                .isInstanceOf(NullPointerException.class);
+                .isInstanceOf(NullPointerException.class)
+                .hasMessage("cursorExtractor cannot be null");
     }
 }

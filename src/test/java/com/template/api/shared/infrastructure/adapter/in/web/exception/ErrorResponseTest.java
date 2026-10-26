@@ -9,12 +9,6 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/**
- * Unit tests for {@link ErrorResponse}.
- * <p>
- * Verifies JSON serialization semantics, omission of empty violation lists due to {@code JsonInclude.Include.NON_EMPTY},
- * and canonical record constructor defaults.
- */
 @DisplayName("ErrorResponse Unit Tests")
 class ErrorResponseTest {
 
@@ -22,7 +16,7 @@ class ErrorResponseTest {
 
     @Test
     @DisplayName("Should omit errors list in JSON payload when errors is empty due to NON_EMPTY inclusion")
-    void shouldOmitEmptyErrorsListInJson() throws Exception {
+    void should_omit_errors_list_when_errors_is_empty() throws Exception {
         ErrorResponse response = new ErrorResponse(404, "RESOURCE_NOT_FOUND", "Entity not found");
 
         String json = objectMapper.writeValueAsString(response);
@@ -35,7 +29,7 @@ class ErrorResponseTest {
 
     @Test
     @DisplayName("Should serialize errors with field violations when errors is populated")
-    void shouldSerializeErrorsWithViolations() throws Exception {
+    void should_serialize_errors_with_violations_when_errors_is_populated() throws Exception {
         List<FieldViolation> violations = List.of(
                 new FieldViolation("email", "must be a valid email address"),
                 new FieldViolation("age", "must be greater than 18")
@@ -55,7 +49,7 @@ class ErrorResponseTest {
 
     @Test
     @DisplayName("Record accessors and 3-arg constructor should initialize default empty errors")
-    void recordAccessorsAndConstructor() {
+    void should_initialize_empty_errors_when_three_arg_constructor_invoked() {
         ErrorResponse response = new ErrorResponse(500, "INTERNAL_SERVER_ERROR", "Unexpected error");
 
         assertThat(response.status()).isEqualTo(500);
