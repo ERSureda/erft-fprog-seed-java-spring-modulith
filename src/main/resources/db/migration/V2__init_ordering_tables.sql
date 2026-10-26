@@ -1,7 +1,6 @@
 -- =============================================================================
 -- V2__init_ordering_tables.sql
 -- Bounded Context: ORDERING
--- Cumplimiento normativo: OUT-06, OUT-07, OUT-08, TRX-02, SHR-02, SHR-03
 -- =============================================================================
 
 CREATE SCHEMA IF NOT EXISTS ordering;
@@ -21,31 +20,26 @@ CREATE TYPE ordering.order_status AS ENUM (
 -- 2. TABLA: orders (Aggregate Root)
 -- -----------------------------------------------------------------------------
 CREATE TABLE ordering.orders (
-    id UUID NOT NULL,
-    tenant_id UUID NOT NULL,
-    version BIGINT NOT NULL DEFAULT 0,
-    status VARCHAR(32) NOT NULL DEFAULT 'PENDING',
-    customer_id UUID NOT NULL,
-    amount NUMERIC(12, 2) NOT NULL,
-    currency shared.currency NOT NULL DEFAULT 'EUR',
-    created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
-    deleted_at TIMESTAMPTZ,
+    version            BIGINT                      NOT NULL DEFAULT 0,
+    created_at         TIMESTAMPTZ                 NOT NULL DEFAULT clock_timestamp(),
+    updated_at         TIMESTAMPTZ                 NOT NULL DEFAULT clock_timestamp(),
+    deleted_at         TIMESTAMPTZ,
+    status             VARCHAR(32)                 NOT NULL DEFAULT 'PENDING',
+    id                 UUID                        NOT NULL,
+    tenant_id          UUID                        NOT NULL,
+    customer_id        UUID                        NOT NULL,
+    amount             NUMERIC(12, 2)              NOT NULL,
+    currency           shared.currency             NOT NULL DEFAULT 'EUR',
 
-    CONSTRAINT pk_orders PRIMARY KEY (id),
-    CONSTRAINT chk_orders_ver_pos CHECK (version >= 0),
-    CONSTRAINT chk_orders_upd_coh CHECK (updated_at >= created_at),
-    CONSTRAINT chk_orders_del_time CHECK (deleted_at IS NULL OR deleted_at >= created_at),
-    CONSTRAINT chk_orders_amount_pos CHECK (amount >= 0.00),
-    CONSTRAINT chk_orders_status_valid CHECK (status IN ('PENDING', 'CONFIRMED', 'SHIPPED', 'CANCELLED'))
+    CONSTRAINT pk_orders                    PRIMARY KEY (id),
+    CONSTRAINT chk_orders_version_non_neg   CHECK (version >= 0),
+    CONSTRAINT chk_orders_updated_coherence CHECK (updated_at >= created_at),
+    CONSTRAINT chk_orders_deleted_coherence CHECK (deleted_at IS NULL OR deleted_at >= created_at),
+    CONSTRAINT chk_orders_amount_pos        CHECK (amount >= 0.00),
+    CONSTRAINT chk_orders_status_valid      CHECK (status IN ('PENDING', 'CONFIRMED', 'SHIPPED', 'CANCELLED'))
 ) WITH (
     fillfactor = 90
 );
-
-COMMENT ON TABLE ordering.orders IS 'Aggregate Root que gestiona el ciclo de vida de pedidos.';
-COMMENT ON COLUMN ordering.orders.id IS 'Identificador UUIDv7 del agregado.';
-COMMENT ON COLUMN ordering.orders.tenant_id IS 'Identificador de inquilino para aislamiento RLS.';
-COMMENT ON COLUMN ordering.orders.customer_id IS 'Referencia escalar al cliente sin FOREIGN KEY (OUT-06).';
 
 -- Índices operativos y de consulta
 CREATE INDEX idx_orders_tenant_pagination ON ordering.orders (tenant_id, created_at DESC)
@@ -58,25 +52,21 @@ CREATE INDEX idx_orders_status ON ordering.orders (tenant_id, status, created_at
 -- 3. AUDIT LOG (Particionado Mensual)
 -- -----------------------------------------------------------------------------
 CREATE TABLE ordering.audit_log (
-    id UUID NOT NULL,
-    tenant_id UUID,
-    actor_id UUID NOT NULL,
-    actor_type shared.actor_type NOT NULL DEFAULT 'SYSTEM',
-    entity_name VARCHAR(64) NOT NULL,
-    entity_id UUID NOT NULL,
-    action VARCHAR(64) NOT NULL,
+    occurred_at    TIMESTAMPTZ       NOT NULL DEFAULT clock_timestamp(),
+    actor_type     shared.actor_type NOT NULL,
+    id             UUID              NOT NULL,
+    actor_id       UUID              NOT NULL,
+    entity_id      UUID              NOT NULL,
+    tenant_id      UUID,
+    changes        JSONB             NOT NULL,
+    action         VARCHAR(64)       NOT NULL,
+    entity_name    VARCHAR(64)       NOT NULL,
+    ip_address     INET,
     correlation_id VARCHAR(120),
-    ip_address INET,
-    changes JSONB NOT NULL,
-    occurred_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
 
     CONSTRAINT pk_ordering_audit PRIMARY KEY (id, occurred_at),
     CONSTRAINT chk_ordering_audit_changes_object CHECK (jsonb_typeof(changes) = 'object')
 ) PARTITION BY RANGE (occurred_at);
-
-COMMENT ON TABLE ordering.audit_log IS 'Bitácora inmutable de pistas de auditoría particionada por rango temporal.';
-COMMENT ON COLUMN ordering.audit_log.id IS 'Identificador UUIDv7 del registro de auditoría.';
-COMMENT ON COLUMN ordering.audit_log.tenant_id IS 'Identificador de inquilino para aislamiento RLS.';
 
 -- Partición por defecto
 CREATE TABLE ordering.audit_log_default
@@ -131,9 +121,6 @@ CREATE TABLE ordering.outbox_events (
     autovacuum_analyze_scale_factor = 0.02
 );
 
-COMMENT ON TABLE ordering.outbox_events IS 'Bandeja de salida transaccional del módulo Ordering para publicación atómica de eventos.';
-COMMENT ON COLUMN ordering.outbox_events.event_id IS 'Identificador UUIDv7 del evento Outbox.';
-
 -- Índices operativos (SKIP LOCKED y reintentos)
 CREATE INDEX idx_ordering_outbox_events_pending
     ON ordering.outbox_events (created_at ASC, event_id ASC)
@@ -180,10 +167,6 @@ CREATE TABLE ordering.processed_events (
     autovacuum_analyze_scale_factor = 0.02
 );
 
-COMMENT ON TABLE ordering.processed_events IS 'Compuerta de idempotencia del módulo Ordering para deduplicación de eventos entrantes.';
-COMMENT ON COLUMN ordering.processed_events.event_id IS 'Identificador UUID del evento procesado.';
-COMMENT ON COLUMN ordering.processed_events.consumer_name IS 'Identificador del consumidor que procesó el evento.';
-
 -- Índices de consulta y purga TTL
 CREATE INDEX idx_ordering_processed_events_purge
     ON ordering.processed_events (processed_at ASC);
@@ -197,14 +180,14 @@ CREATE INDEX idx_ordering_processed_events_consumer
 ALTER TABLE ordering.orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ordering.orders FORCE ROW LEVEL SECURITY;
 CREATE POLICY rls_ordering_orders ON ordering.orders
-    USING (tenant_id = (SELECT NULLIF(current_setting('app.current_tenant_id', true), '')::uuid))
-    WITH CHECK (tenant_id = (SELECT NULLIF(current_setting('app.current_tenant_id', true), '')::uuid));
+    USING (tenant_id = (SELECT nullif(current_setting('app.current_tenant_id', true), '')::uuid))
+    WITH CHECK (tenant_id = (SELECT nullif(current_setting('app.current_tenant_id', true), '')::uuid));
 
 ALTER TABLE ordering.audit_log ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ordering.audit_log FORCE ROW LEVEL SECURITY;
 CREATE POLICY rls_ordering_audit_log ON ordering.audit_log
-    USING (tenant_id IS NOT DISTINCT FROM (SELECT NULLIF(current_setting('app.current_tenant_id', true), '')::uuid))
-    WITH CHECK (tenant_id IS NOT DISTINCT FROM (SELECT NULLIF(current_setting('app.current_tenant_id', true), '')::uuid));
+    USING (tenant_id IS NOT DISTINCT FROM (SELECT nullif(current_setting('app.current_tenant_id', true), '')::uuid))
+    WITH CHECK (tenant_id IS NOT DISTINCT FROM (SELECT nullif(current_setting('app.current_tenant_id', true), '')::uuid));
 
 -- -----------------------------------------------------------------------------
 -- 7. PERMISOS E INMUTABILIDAD
