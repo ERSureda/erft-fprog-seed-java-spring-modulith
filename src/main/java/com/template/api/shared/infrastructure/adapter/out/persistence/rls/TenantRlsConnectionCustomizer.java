@@ -1,39 +1,60 @@
 package com.template.api.shared.infrastructure.adapter.out.persistence.rls;
 
 import com.template.api.shared.infrastructure.adapter.out.context.ExecutionContextHolder;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.UUID;
 
+@Slf4j
 @Aspect
 @Component
 @Order(Ordered.LOWEST_PRECEDENCE)
+@RequiredArgsConstructor
+@ConditionalOnBean(JdbcTemplate.class)
 public class TenantRlsConnectionCustomizer {
 
-    private final JdbcTemplate jdbcTemplate;
+    private static final String TENANT_RLS_APPLIED = "TENANT_RLS_APPLIED";
+    private static final String SET_TENANT_SQL = "SELECT set_config('app.current_tenant_id', ?, true)";
 
-    public TenantRlsConnectionCustomizer(JdbcTemplate jdbcTemplate) {
-        this.jdbcTemplate = jdbcTemplate;
-    }
+    private final JdbcTemplate jdbcTemplate;
 
     @Around("@annotation(org.springframework.transaction.annotation.Transactional) || @within(org.springframework.transaction.annotation.Transactional)")
     public Object applyTenantRls(ProceedingJoinPoint joinPoint) throws Throwable {
         UUID tenantId = ExecutionContextHolder.getTenantId();
         if (tenantId != null) {
-            setTenantSessionVariable(tenantId);
+            if (TransactionSynchronizationManager.isSynchronizationActive()) {
+                if (TransactionSynchronizationManager.getResource(TENANT_RLS_APPLIED) == null) {
+                    setTenantSessionVariable(tenantId);
+                    TransactionSynchronizationManager.bindResource(TENANT_RLS_APPLIED, Boolean.TRUE);
+                    TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                        @Override
+                        public void afterCompletion(int status) {
+                            TransactionSynchronizationManager.unbindResourceIfPossible(TENANT_RLS_APPLIED);
+                        }
+                    });
+                }
+            } else {
+                setTenantSessionVariable(tenantId);
+            }
         }
         return joinPoint.proceed();
     }
 
     public void setTenantSessionVariable(UUID tenantId) {
         if (tenantId != null && jdbcTemplate != null) {
-            jdbcTemplate.execute("SELECT set_config('app.current_tenant_id', '" + tenantId + "', true)");
+            log.trace("Applying PostgreSQL RLS session variable for tenant: {}", tenantId);
+            jdbcTemplate.queryForObject(SET_TENANT_SQL, String.class, tenantId.toString());
         }
     }
 }

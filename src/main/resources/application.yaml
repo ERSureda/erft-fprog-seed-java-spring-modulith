@@ -41,3 +41,5 @@ outbox:
 
 partition:
   maintenance-cron: "0 0 2 1 * ?"
+  lookahead-months: 3
+  lookbehind-months: 1
