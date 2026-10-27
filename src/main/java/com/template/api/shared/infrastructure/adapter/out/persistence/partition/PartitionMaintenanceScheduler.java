@@ -3,9 +3,15 @@ package com.template.api.shared.infrastructure.adapter.out.persistence.partition
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.jdbc.core.ConnectionCallback;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 
 @Slf4j
 @Component
@@ -34,35 +40,57 @@ public class PartitionMaintenanceScheduler {
     @Scheduled(cron = "${partition.maintenance-cron:0 0 2 1 * ?}")
     public void maintainPartitions() {
         log.info("Attempting to acquire partition maintenance advisory lock...");
-
-        Boolean lockAcquired;
         try {
-            lockAcquired = jdbcTemplate.queryForObject(TRY_LOCK_SQL, Boolean.class, ADVISORY_LOCK_ID);
+            jdbcTemplate.execute((ConnectionCallback<Void>) this::executeWithSingleConnection);
+        } catch (Exception ex) {
+            log.error("Failed to execute partition maintenance session: {}", ex.getMessage(), ex);
+        }
+    }
+
+    private Void executeWithSingleConnection(Connection connection) {
+        boolean lockAcquired;
+        try {
+            lockAcquired = tryAcquireLock(connection);
         } catch (Exception ex) {
             log.error("Failed to query advisory lock for partition maintenance: {}", ex.getMessage(), ex);
-            return;
+            return null;
         }
 
-        if (!Boolean.TRUE.equals(lockAcquired)) {
+        if (!lockAcquired) {
             log.info("Partition maintenance skipped: lock is already held by another application instance.");
-            return;
+            return null;
         }
 
         try {
             log.info("Starting automated monthly partition maintenance (lookahead: {}, lookbehind: {})...",
                     lookaheadMonths, lookbehindMonths);
-            jdbcTemplate.update(MAINTAIN_PARTITIONS_SQL, lookaheadMonths, lookbehindMonths);
+            try (PreparedStatement stmt = connection.prepareStatement(MAINTAIN_PARTITIONS_SQL)) {
+                stmt.setInt(1, lookaheadMonths);
+                stmt.setInt(2, lookbehindMonths);
+                stmt.execute();
+            }
             log.info("Monthly partition maintenance completed successfully.");
         } catch (Exception ex) {
             log.error("Failed to maintain monthly partitions: {}", ex.getMessage(), ex);
         } finally {
-            releaseAdvisoryLock();
+            releaseAdvisoryLock(connection);
+        }
+        return null;
+    }
+
+    private boolean tryAcquireLock(Connection connection) throws SQLException {
+        try (PreparedStatement stmt = connection.prepareStatement(TRY_LOCK_SQL)) {
+            stmt.setLong(1, ADVISORY_LOCK_ID);
+            try (ResultSet rs = stmt.executeQuery()) {
+                return rs.next() && rs.getBoolean(1);
+            }
         }
     }
 
-    private void releaseAdvisoryLock() {
-        try {
-            jdbcTemplate.queryForObject(UNLOCK_SQL, Boolean.class, ADVISORY_LOCK_ID);
+    private void releaseAdvisoryLock(Connection connection) {
+        try (PreparedStatement stmt = connection.prepareStatement(UNLOCK_SQL)) {
+            stmt.setLong(1, ADVISORY_LOCK_ID);
+            stmt.execute();
             log.debug("Partition maintenance advisory lock released successfully.");
         } catch (Exception ex) {
             log.warn("Failed to release partition maintenance advisory lock: {}", ex.getMessage(), ex);

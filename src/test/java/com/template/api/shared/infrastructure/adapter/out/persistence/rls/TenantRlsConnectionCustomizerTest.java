@@ -134,4 +134,49 @@ class TenantRlsConnectionCustomizerTest {
 
         verifyNoInteractions(jdbcTemplate);
     }
+
+    @Test
+    @DisplayName("Should re-apply set_config in REQUIRES_NEW suspended transaction and restore parent state on resume")
+    void should_reapply_set_config_when_transaction_is_suspended_and_resumed() throws Throwable {
+        TransactionSynchronizationManager.initSynchronization();
+
+        UUID tenantId = UUID.randomUUID();
+        ExecutionContextHolder.set(new ExecutionContext(tenantId, UUID.randomUUID(), Set.of("USER")));
+        when(joinPoint.proceed()).thenReturn("outer", "inner", "outerAfterResume");
+
+        // 1. Outer transaction starts
+        customizer.applyTenantRls(joinPoint);
+        List<TransactionSynchronization> outerSyncs = TransactionSynchronizationManager.getSynchronizations();
+        assertThat(TransactionSynchronizationManager.getResource("TENANT_RLS_APPLIED")).isEqualTo(Boolean.TRUE);
+
+        // 2. Simulate Spring suspending outer transaction for Propagation.REQUIRES_NEW
+        for (TransactionSynchronization sync : outerSyncs) {
+            sync.suspend();
+        }
+        assertThat(TransactionSynchronizationManager.getResource("TENANT_RLS_APPLIED")).isNull();
+
+        // 3. Inner transaction executes on a new connection: must execute set_config again
+        TransactionSynchronizationManager.clearSynchronization();
+        TransactionSynchronizationManager.initSynchronization();
+        customizer.applyTenantRls(joinPoint);
+        List<TransactionSynchronization> innerSyncs = TransactionSynchronizationManager.getSynchronizations();
+        assertThat(TransactionSynchronizationManager.getResource("TENANT_RLS_APPLIED")).isEqualTo(Boolean.TRUE);
+
+        // 4. Inner transaction completes
+        for (TransactionSynchronization sync : innerSyncs) {
+            sync.afterCompletion(TransactionSynchronization.STATUS_COMMITTED);
+        }
+        assertThat(TransactionSynchronizationManager.getResource("TENANT_RLS_APPLIED")).isNull();
+
+        // 5. Outer transaction resumes
+        for (TransactionSynchronization sync : outerSyncs) {
+            sync.resume();
+        }
+        assertThat(TransactionSynchronizationManager.getResource("TENANT_RLS_APPLIED")).isEqualTo(Boolean.TRUE);
+
+        // 6. Another call in resumed outer transaction must not re-execute set_config
+        customizer.applyTenantRls(joinPoint);
+
+        verify(jdbcTemplate, times(2)).queryForObject(SET_TENANT_SQL, String.class, tenantId.toString());
+    }
 }

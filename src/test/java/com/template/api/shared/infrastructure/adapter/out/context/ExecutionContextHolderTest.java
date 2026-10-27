@@ -88,4 +88,40 @@ class ExecutionContextHolderTest {
         assertThat(executedContext.get()).isSameAs(innerContext);
         assertThat(ExecutionContextHolder.get()).isNull();
     }
+
+    @Test
+    @DisplayName("Should return computed value and restore previous context when callWith is invoked")
+    void should_return_value_and_restore_context_when_call_with_invoked() {
+        UUID tenantId = UUID.randomUUID();
+        ExecutionContext context = new ExecutionContext(tenantId, UUID.randomUUID(), Set.of("USER"), "corr-call-1");
+
+        String result = ExecutionContextHolder.callWith(context, () ->
+                ExecutionContextHolder.getTenantId() + ":" + ExecutionContextHolder.getCorrelationId()
+        );
+
+        assertThat(result).isEqualTo(tenantId + ":corr-call-1");
+        assertThat(ExecutionContextHolder.get()).isNull();
+    }
+
+    @Test
+    @DisplayName("Should propagate and restore eventId when runWith eventId overload is invoked")
+    void should_propagate_and_restore_event_id_when_run_with_event_id_invoked() {
+        UUID outerEventId = UUID.randomUUID();
+        UUID innerEventId = UUID.randomUUID();
+        ExecutionContext context = ExecutionContext.anonymous();
+
+        AtomicReference<UUID> capturedInner = new AtomicReference<>();
+        AtomicReference<UUID> capturedAfterInner = new AtomicReference<>();
+
+        ExecutionContextHolder.runWith(context, outerEventId, () -> {
+            ExecutionContextHolder.runWith(context, innerEventId, () ->
+                    capturedInner.set(ExecutionContextHolder.getEventId())
+            );
+            capturedAfterInner.set(ExecutionContextHolder.getEventId());
+        });
+
+        assertThat(capturedInner.get()).isEqualTo(innerEventId);
+        assertThat(capturedAfterInner.get()).isEqualTo(outerEventId);
+        assertThat(ExecutionContextHolder.getEventId()).isNull();
+    }
 }

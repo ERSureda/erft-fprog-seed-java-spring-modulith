@@ -1,14 +1,14 @@
 package com.template.api.shared.infrastructure.adapter.in.web.context;
 
 import com.template.api.shared.application.context.ExecutionContext;
+import com.template.api.shared.application.port.out.UuidGeneratorPort;
 import com.template.api.shared.infrastructure.adapter.in.web.ApiHeaders;
 import com.template.api.shared.infrastructure.adapter.out.context.ExecutionContextHolder;
+import com.template.api.shared.infrastructure.adapter.out.uuid.UuidGeneratorAdapter;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import com.template.api.shared.application.port.out.UuidGeneratorPort;
-import com.template.api.shared.infrastructure.adapter.out.uuid.UuidGeneratorAdapter;
 import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.Ordered;
@@ -31,6 +31,7 @@ public class ExecutionContextFilter extends OncePerRequestFilter {
 
     private final UuidGeneratorPort uuidGenerator;
 
+    @Autowired
     public ExecutionContextFilter(@Autowired(required = false) UuidGeneratorPort uuidGenerator) {
         this.uuidGenerator = (uuidGenerator != null) ? uuidGenerator : new UuidGeneratorAdapter();
     }
@@ -106,6 +107,10 @@ public class ExecutionContextFilter extends OncePerRequestFilter {
         if (rawRoles == null || rawRoles.isBlank()) {
             return Set.of();
         }
+        if (rawRoles.indexOf(',') < 0) {
+            String single = rawRoles.trim();
+            return single.isEmpty() ? Set.of() : Set.of(single);
+        }
         String[] tokens = rawRoles.split(",");
         Set<String> roles = HashSet.newHashSet(tokens.length);
         for (String token : tokens) {
@@ -114,6 +119,6 @@ public class ExecutionContextFilter extends OncePerRequestFilter {
                 roles.add(trimmed);
             }
         }
-        return roles.isEmpty() ? Set.of() : Set.copyOf(roles);
+        return roles;
     }
 }

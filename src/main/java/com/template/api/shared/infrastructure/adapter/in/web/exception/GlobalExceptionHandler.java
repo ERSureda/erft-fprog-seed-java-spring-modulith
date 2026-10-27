@@ -6,8 +6,7 @@ import com.template.api.shared.domain.error.FieldViolation;
 import com.template.api.shared.domain.exception.BaseException;
 import com.template.api.shared.domain.exception.ValidationException;
 import jakarta.validation.ConstraintViolationException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -22,10 +21,10 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
 
 import java.util.List;
 
+@Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
-    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
     private static final String INTERNAL_ERROR_MSG = "An unexpected error occurred";
     private static final String VALIDATION_FAILED_MSG = "Validation failed for one or more fields";
 
@@ -106,6 +105,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             case 404 -> CommonError.RESOURCE_NOT_FOUND.code();
             case 401 -> CommonError.UNAUTHENTICATED.code();
             case 403 -> CommonError.FORBIDDEN.code();
+            case 409 -> CommonError.RESOURCE_CONFLICT.code();
             default -> statusCode.is4xxClientError()
                     ? CommonError.VALIDATION_FAILED.code()
                     : CommonError.INTERNAL_SERVER_ERROR.code();

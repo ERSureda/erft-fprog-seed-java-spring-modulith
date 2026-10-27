@@ -22,7 +22,7 @@ public record PageResult<T>(
     }
 
     public <U> PageResult<U> map(Function<? super T, U> mapper) {
-        Objects.requireNonNull(mapper, "mapper cannot be null");
+        Objects.requireNonNull(mapper, "PAGE_RESULT_MAPPER_CANNOT_BE_NULL");
         if (items.isEmpty()) {
             return new PageResult<>(List.of(), page, size, totalElements, totalPages);
         }

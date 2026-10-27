@@ -1,11 +1,14 @@
 package com.template.api.shared.infrastructure.adapter.out.persistence.jdbc;
 
+import com.template.api.shared.domain.exception.InfrastructureException;
+import com.template.api.shared.domain.exception.ValidationException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 
 import java.util.Map;
@@ -27,10 +30,12 @@ class JdbcIdempotencyGateTest {
     private NamedParameterJdbcTemplate jdbcTemplate;
 
     private JdbcIdempotencyGate idempotencyGate;
+    private JdbcIdempotencyGate isolatedIdempotencyGate;
 
     @BeforeEach
     void setUp() {
         idempotencyGate = new JdbcIdempotencyGate(jdbcTemplate);
+        isolatedIdempotencyGate = new JdbcIdempotencyGate(jdbcTemplate, true);
     }
 
     @Test
@@ -56,24 +61,27 @@ class JdbcIdempotencyGateTest {
     }
 
     @Test
-    @DisplayName("tryAcquire with schema parameter should insert and return true when successful")
+    @DisplayName("tryAcquire with schema parameter should use shared in monolith mode and module schema when isolated")
     void should_return_true_when_try_acquire_with_module_schema_succeeds() {
         UUID eventId = UUID.randomUUID();
+        when(jdbcTemplate.update(contains("INSERT INTO shared.processed_events"), eq(Map.of(
+                "eventId", eventId,
+                "consumerName", "OrderingWorker"
+        )))).thenReturn(1);
         when(jdbcTemplate.update(contains("INSERT INTO ordering.processed_events"), eq(Map.of(
                 "eventId", eventId,
                 "consumerName", "OrderingWorker"
         )))).thenReturn(1);
 
-        boolean acquired = idempotencyGate.tryAcquire("ordering", eventId, "OrderingWorker");
-
-        assertThat(acquired).isTrue();
+        assertThat(idempotencyGate.tryAcquire("ordering", eventId, "OrderingWorker")).isTrue();
+        assertThat(isolatedIdempotencyGate.tryAcquire("ordering", eventId, "OrderingWorker")).isTrue();
     }
 
     @Test
     @DisplayName("tryAcquire should fallback to default consumer when consumerName is blank or null")
     void should_fallback_to_default_consumer_when_consumer_name_is_blank() {
         UUID eventId = UUID.randomUUID();
-        when(jdbcTemplate.update(contains("INSERT INTO ordering.processed_events"), eq(Map.of(
+        when(jdbcTemplate.update(contains("INSERT INTO shared.processed_events"), eq(Map.of(
                 "eventId", eventId,
                 "consumerName", "default"
         )))).thenReturn(1);
@@ -88,7 +96,7 @@ class JdbcIdempotencyGateTest {
     void should_throw_when_try_acquire_event_id_is_null() {
         assertThatThrownBy(() -> idempotencyGate.tryAcquire("ordering", null, "OrderingWorker"))
                 .isInstanceOf(NullPointerException.class)
-                .hasMessageContaining("eventId must not be null");
+                .hasMessage("IDEMPOTENCY_EVENT_ID_CANNOT_BE_NULL");
     }
 
     @Test
@@ -108,7 +116,7 @@ class JdbcIdempotencyGateTest {
     void should_delete_target_when_release_with_schema_and_consumer_invoked() {
         UUID eventId = UUID.randomUUID();
 
-        idempotencyGate.release("ordering", eventId, "OrderingWorker");
+        isolatedIdempotencyGate.release("ordering", eventId, "OrderingWorker");
 
         verify(jdbcTemplate).update(
                 contains("ordering.processed_events WHERE event_id = :eventId AND consumer_name = :consumerName"),
@@ -121,7 +129,7 @@ class JdbcIdempotencyGateTest {
     void should_delete_all_consumers_when_release_consumer_name_is_null() {
         UUID eventId = UUID.randomUUID();
 
-        idempotencyGate.release("ordering", eventId, null);
+        isolatedIdempotencyGate.release("ordering", eventId, null);
 
         verify(jdbcTemplate).update(
                 contains("DELETE FROM ordering.processed_events WHERE event_id = :eventId"),
@@ -134,7 +142,7 @@ class JdbcIdempotencyGateTest {
     void should_throw_when_release_event_id_is_null() {
         assertThatThrownBy(() -> idempotencyGate.release((UUID) null))
                 .isInstanceOf(NullPointerException.class)
-                .hasMessageContaining("eventId must not be null");
+                .hasMessage("IDEMPOTENCY_EVENT_ID_CANNOT_BE_NULL");
     }
 
     @Test
@@ -154,7 +162,7 @@ class JdbcIdempotencyGateTest {
         UUID eventId = UUID.randomUUID();
         when(jdbcTemplate.queryForObject(contains("EXISTS"), eq(Map.of("eventId", eventId)), eq(Boolean.class))).thenReturn(Boolean.TRUE);
 
-        boolean processed = idempotencyGate.isProcessed("ordering", eventId);
+        boolean processed = isolatedIdempotencyGate.isProcessed("ordering", eventId);
 
         assertThat(processed).isTrue();
     }
@@ -175,7 +183,7 @@ class JdbcIdempotencyGateTest {
     void should_throw_when_is_processed_event_id_is_null() {
         assertThatThrownBy(() -> idempotencyGate.isProcessed(null))
                 .isInstanceOf(NullPointerException.class)
-                .hasMessageContaining("eventId must not be null");
+                .hasMessage("IDEMPOTENCY_EVENT_ID_CANNOT_BE_NULL");
     }
 
     @Test
@@ -184,9 +192,31 @@ class JdbcIdempotencyGateTest {
         UUID eventId = UUID.randomUUID();
         when(jdbcTemplate.update(contains("INSERT INTO shared.processed_events"), anyMap())).thenReturn(1);
 
-        assertThat(idempotencyGate.tryAcquire("default", eventId, "Worker")).isTrue();
-        assertThat(idempotencyGate.tryAcquire("shared", eventId, "Worker")).isTrue();
-        assertThat(idempotencyGate.tryAcquire("   ", eventId, "Worker")).isTrue();
-        assertThat(idempotencyGate.tryAcquire(null, eventId, "Worker")).isTrue();
+        assertThat(isolatedIdempotencyGate.tryAcquire("default", eventId, "Worker")).isTrue();
+        assertThat(isolatedIdempotencyGate.tryAcquire("shared", eventId, "Worker")).isTrue();
+        assertThat(isolatedIdempotencyGate.tryAcquire("   ", eventId, "Worker")).isTrue();
+        assertThat(isolatedIdempotencyGate.tryAcquire(null, eventId, "Worker")).isTrue();
+    }
+
+    @Test
+    @DisplayName("should_throw_validation_exception_when_schema_name_is_invalid")
+    void should_throw_validation_exception_when_schema_name_is_invalid() {
+        UUID eventId = UUID.randomUUID();
+
+        assertThatThrownBy(() -> isolatedIdempotencyGate.tryAcquire("bad-schema;DROP", eventId, "Worker"))
+                .isInstanceOf(ValidationException.class)
+                .hasMessageContaining("IDEMPOTENCY_INVALID_SCHEMA_NAME");
+    }
+
+    @Test
+    @DisplayName("should_wrap_jdbc_exceptions_in_infrastructure_exception_preserving_cause")
+    void should_wrap_jdbc_exceptions_in_infrastructure_exception_preserving_cause() {
+        UUID eventId = UUID.randomUUID();
+        DataAccessResourceFailureException dbError = new DataAccessResourceFailureException("DB connection lost");
+        when(jdbcTemplate.update(contains("INSERT INTO shared.processed_events"), anyMap())).thenThrow(dbError);
+
+        assertThatThrownBy(() -> idempotencyGate.tryAcquire(eventId, "Worker"))
+                .isInstanceOf(InfrastructureException.class)
+                .hasCause(dbError);
     }
 }

@@ -25,7 +25,7 @@ class SpringEventPublisherAdapterTest {
     void should_throw_null_pointer_exception_when_publisher_is_null() {
         assertThatThrownBy(() -> new SpringEventPublisherAdapter(null))
                 .isInstanceOf(NullPointerException.class)
-                .hasMessage("publisher cannot be null");
+                .hasMessage("EVENT_PUBLISHER_CANNOT_BE_NULL");
     }
 
     @Test

@@ -81,7 +81,7 @@ public record Money(BigDecimal amount, Currency currency) implements ValueObject
         Objects.requireNonNull(other, "MONEY_OTHER_CANNOT_BE_NULL");
         if (!isSameCurrency(other)) {
             throw new ValidationException(String.format(
-                    "Currency mismatch: cannot operate between %s and %s",
+                    "MONEY_CURRENCY_MISMATCH: Currency mismatch between %s and %s",
                     this.currency.getCurrencyCode(),
                     other.currency.getCurrencyCode()
             ));
@@ -103,7 +103,7 @@ public record Money(BigDecimal amount, Currency currency) implements ValueObject
 
     @Override
     public int hashCode() {
-        int result = this.amount.stripTrailingZeros().hashCode();
+        int result = (this.amount.signum() == 0 ? BigDecimal.ZERO : this.amount.stripTrailingZeros()).hashCode();
         return 31 * result + this.currency.hashCode();
     }
 

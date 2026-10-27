@@ -27,6 +27,25 @@ public class TenantRlsConnectionCustomizer {
     private static final String TENANT_RLS_APPLIED = "TENANT_RLS_APPLIED";
     private static final String SET_TENANT_SQL = "SELECT set_config('app.current_tenant_id', ?, true)";
 
+    private static final TransactionSynchronization UNBIND_RLS_SYNCHRONIZATION = new TransactionSynchronization() {
+        @Override
+        public void suspend() {
+            TransactionSynchronizationManager.unbindResourceIfPossible(TENANT_RLS_APPLIED);
+        }
+
+        @Override
+        public void resume() {
+            if (!TransactionSynchronizationManager.hasResource(TENANT_RLS_APPLIED)) {
+                TransactionSynchronizationManager.bindResource(TENANT_RLS_APPLIED, Boolean.TRUE);
+            }
+        }
+
+        @Override
+        public void afterCompletion(int status) {
+            TransactionSynchronizationManager.unbindResourceIfPossible(TENANT_RLS_APPLIED);
+        }
+    };
+
     private final JdbcTemplate jdbcTemplate;
 
     @Around("@annotation(org.springframework.transaction.annotation.Transactional) || @within(org.springframework.transaction.annotation.Transactional)")
@@ -37,12 +56,7 @@ public class TenantRlsConnectionCustomizer {
                 if (TransactionSynchronizationManager.getResource(TENANT_RLS_APPLIED) == null) {
                     setTenantSessionVariable(tenantId);
                     TransactionSynchronizationManager.bindResource(TENANT_RLS_APPLIED, Boolean.TRUE);
-                    TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-                        @Override
-                        public void afterCompletion(int status) {
-                            TransactionSynchronizationManager.unbindResourceIfPossible(TENANT_RLS_APPLIED);
-                        }
-                    });
+                    TransactionSynchronizationManager.registerSynchronization(UNBIND_RLS_SYNCHRONIZATION);
                 }
             } else {
                 setTenantSessionVariable(tenantId);

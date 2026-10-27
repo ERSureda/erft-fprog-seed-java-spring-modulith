@@ -1,8 +1,10 @@
 package com.template.api.shared.infrastructure.adapter.out.event;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.template.api.shared.application.context.ExecutionContext;
 import com.template.api.shared.application.port.out.EventPublisherPort;
 import com.template.api.shared.domain.event.DomainEvent;
+import com.template.api.shared.infrastructure.adapter.out.context.ExecutionContextHolder;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -13,9 +15,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -63,34 +67,49 @@ class OutboxRelayServiceTest {
     }
 
     @Test
-    @DisplayName("Should claim in batch, publish domain event, and transition to DELIVERED individually")
+    @DisplayName("Should claim in batch, propagate context, publish domain event, and transition to DELIVERED")
     void should_transition_status_and_publish_event_when_pending_events_exist() throws Exception {
         UUID eventId = UUID.randomUUID();
+        UUID tenantId = UUID.randomUUID();
         TestOutboxEvent event = new TestOutboxEvent("agg-1");
         String payloadJson = objectMapper.writeValueAsString(event);
 
-        Map<String, Object> row = Map.of(
-                "event_id", eventId,
-                "event_type", TestOutboxEvent.class.getName(),
-                "payload", payloadJson,
-                "retry_count", 0
-        );
+        Map<String, Object> row = new HashMap<>();
+        row.put("event_id", eventId);
+        row.put("tenant_id", tenantId);
+        row.put("correlation_id", "corr-relay-1");
+        row.put("event_type", TestOutboxEvent.class.getName());
+        row.put("payload", payloadJson);
+        row.put("retry_count", 0);
 
         when(jdbcTemplate.queryForList(anyString(), anyMap())).thenReturn(List.of(row));
 
+        AtomicReference<ExecutionContext> capturedContext = new AtomicReference<>();
+        AtomicReference<UUID> capturedEventId = new AtomicReference<>();
+        doAnswer(inv -> {
+            capturedContext.set(ExecutionContextHolder.get());
+            capturedEventId.set(ExecutionContextHolder.getEventId());
+            return null;
+        }).when(eventPublisherPort).publish(any());
+
         service.processPendingEvents();
 
-        verify(jdbcTemplate).update(contains("status = 'PROCESSING'"), eq(Map.of("ids", List.of(eventId))));
+        verify(jdbcTemplate).queryForList(contains("SET status = 'PROCESSING'"), eq(Map.of("limit", 50, "staleMinutes", 5)));
 
         ArgumentCaptor<DomainEvent> eventCaptor = ArgumentCaptor.forClass(DomainEvent.class);
         verify(eventPublisherPort).publish(eventCaptor.capture());
         assertThat(eventCaptor.getValue().aggregateId()).isEqualTo("agg-1");
+        assertThat(capturedContext.get()).isNotNull();
+        assertThat(capturedContext.get().tenantId()).isEqualTo(tenantId);
+        assertThat(capturedContext.get().correlationId()).isEqualTo("corr-relay-1");
+        assertThat(capturedEventId.get()).isEqualTo(eventId);
+        assertThat(ExecutionContextHolder.getEventId()).isNull();
 
-        verify(jdbcTemplate).update(contains("status = 'DELIVERED'"), eq(Map.of("id", eventId)));
+        verify(jdbcTemplate).update(contains("status = 'DELIVERED'"), eq(Map.of("ids", List.of(eventId))));
     }
 
     @Test
-    @DisplayName("Should claim multiple events in a single batch and settle each individually")
+    @DisplayName("Should claim multiple events in a single batch and settle delivered IDs in batch")
     void should_claim_multiple_events_in_batch_and_settle_each_individually() throws Exception {
         UUID eventId1 = UUID.randomUUID();
         UUID eventId2 = UUID.randomUUID();
@@ -115,11 +134,9 @@ class OutboxRelayServiceTest {
 
         service.processPendingEvents();
 
-        verify(jdbcTemplate).update(contains("status = 'PROCESSING'"), eq(Map.of("ids", List.of(eventId1, eventId2))));
-
+        verify(jdbcTemplate).queryForList(contains("SET status = 'PROCESSING'"), eq(Map.of("limit", 50, "staleMinutes", 5)));
         verify(eventPublisherPort, times(2)).publish(any(DomainEvent.class));
-        verify(jdbcTemplate).update(contains("status = 'DELIVERED'"), eq(Map.of("id", eventId1)));
-        verify(jdbcTemplate).update(contains("status = 'DELIVERED'"), eq(Map.of("id", eventId2)));
+        verify(jdbcTemplate).update(contains("status = 'DELIVERED'"), eq(Map.of("ids", List.of(eventId1, eventId2))));
     }
 
     @Test
@@ -141,7 +158,7 @@ class OutboxRelayServiceTest {
 
         service.processPendingEvents();
 
-        verify(jdbcTemplate).update(contains("status = 'PROCESSING'"), eq(Map.of("ids", List.of(eventId))));
+        verify(jdbcTemplate).queryForList(contains("SET status = 'PROCESSING'"), eq(Map.of("limit", 50, "staleMinutes", 5)));
         verify(jdbcTemplate, never()).update(contains("status = 'DELIVERED'"), anyMap());
 
         verify(jdbcTemplate).update(
@@ -220,7 +237,7 @@ class OutboxRelayServiceTest {
 
         service.processPendingEvents();
 
-        verify(jdbcTemplate).update(contains("status = 'DELIVERED'"), eq(Map.of("id", eventId1)));
+        verify(jdbcTemplate).update(contains("status = 'DELIVERED'"), eq(Map.of("ids", List.of(eventId1))));
         verify(jdbcTemplate).update(
                 contains("SET status = CASE WHEN :nextRetry >= :maxRetries THEN 'DEAD_LETTER' ELSE 'FAILED' END"),
                 eq(Map.of(
@@ -277,12 +294,12 @@ class OutboxRelayServiceTest {
     @Test
     @DisplayName("Should execute scheduled purge of delivered outbox events and processed idempotency events")
     void should_execute_delete_when_purging_delivered_events() {
-        when(jdbcTemplate.update(contains("DELETE FROM outbox_events"), anyMap())).thenReturn(5);
-        when(jdbcTemplate.update(contains("DELETE FROM processed_events"), anyMap())).thenReturn(3);
+        when(jdbcTemplate.update(contains("DELETE FROM shared.outbox_events"), anyMap())).thenReturn(5);
+        when(jdbcTemplate.update(contains("DELETE FROM shared.processed_events"), anyMap())).thenReturn(3);
 
         service.purgeDeliveredEvents();
 
-        verify(jdbcTemplate).update(contains("DELETE FROM outbox_events"), eq(Map.of("days", 7)));
-        verify(jdbcTemplate).update(contains("DELETE FROM processed_events"), eq(Map.of("days", 7)));
+        verify(jdbcTemplate).update(contains("DELETE FROM shared.outbox_events"), eq(Map.of("days", 7)));
+        verify(jdbcTemplate).update(contains("DELETE FROM shared.processed_events"), eq(Map.of("days", 7)));
     }
 }

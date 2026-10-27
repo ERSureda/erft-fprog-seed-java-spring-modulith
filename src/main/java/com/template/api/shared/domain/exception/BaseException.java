@@ -12,12 +12,12 @@ public abstract class BaseException extends RuntimeException {
 
     protected BaseException(ErrorCode errorCode, ErrorCategory category, String message, Throwable cause) {
         super(
-                (message != null && !message.isBlank()) ? message : Objects.requireNonNull(errorCode).code(),
+                (message != null && !message.isBlank()) ? message : Objects.requireNonNull(errorCode, "BASE_EXCEPTION_ERROR_CODE_CANNOT_BE_NULL").code(),
                 cause,
                 true,
-                Objects.requireNonNull(category, "category cannot be null").capturesDiagnostics()
+                Objects.requireNonNull(category, "BASE_EXCEPTION_CATEGORY_CANNOT_BE_NULL").capturesDiagnostics()
         );
-        this.errorCode = Objects.requireNonNull(errorCode, "errorCode cannot be null");
+        this.errorCode = Objects.requireNonNull(errorCode, "BASE_EXCEPTION_ERROR_CODE_CANNOT_BE_NULL");
         this.category = category;
     }
 

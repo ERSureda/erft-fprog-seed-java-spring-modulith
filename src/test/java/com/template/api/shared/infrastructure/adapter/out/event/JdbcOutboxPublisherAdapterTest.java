@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.template.api.shared.application.port.out.UuidGeneratorPort;
 import com.template.api.shared.domain.event.DomainEvent;
 import com.template.api.shared.domain.exception.InfrastructureException;
+import com.template.api.shared.domain.exception.ValidationException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -14,6 +15,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
+import org.springframework.jdbc.core.namedparam.SqlParameterSource;
 
 import java.util.List;
 import java.util.UUID;
@@ -62,7 +64,7 @@ class JdbcOutboxPublisherAdapterTest {
         adapter.publish(event);
 
         ArgumentCaptor<MapSqlParameterSource> captor = ArgumentCaptor.forClass(MapSqlParameterSource.class);
-        verify(jdbcTemplate, times(1)).update(anyString(), captor.capture());
+        verify(jdbcTemplate, times(1)).update(contains("INSERT INTO shared.outbox_events"), captor.capture());
 
         MapSqlParameterSource params = captor.getValue();
         assertThat(params.getValue("eventId")).isEqualTo(eventId);
@@ -73,7 +75,7 @@ class JdbcOutboxPublisherAdapterTest {
     }
 
     @Test
-    @DisplayName("should_publish_canonical_signature_when_schema_and_aggregate_details_provided")
+    @DisplayName("should_route_to_shared_outbox_in_monolith_mode_and_module_outbox_when_isolated_schemas_enabled")
     void should_publish_canonical_signature_when_schema_and_aggregate_details_provided() throws Exception {
         UUID eventId = UUID.randomUUID();
         UUID aggId = UUID.randomUUID();
@@ -84,15 +86,39 @@ class JdbcOutboxPublisherAdapterTest {
 
         adapter.publish("ordering", "Order", aggId, event);
 
-        ArgumentCaptor<MapSqlParameterSource> captor = ArgumentCaptor.forClass(MapSqlParameterSource.class);
-        verify(jdbcTemplate, times(1)).update(contains("INSERT INTO ordering.outbox_events"), captor.capture());
+        ArgumentCaptor<MapSqlParameterSource> monolithCaptor = ArgumentCaptor.forClass(MapSqlParameterSource.class);
+        verify(jdbcTemplate, times(1)).update(contains("INSERT INTO shared.outbox_events"), monolithCaptor.capture());
+        assertThat(monolithCaptor.getValue().getValue("aggType")).isEqualTo("Order");
+        assertThat(monolithCaptor.getValue().getValue("aggId")).isEqualTo(aggId.toString());
 
-        MapSqlParameterSource params = captor.getValue();
+        JdbcOutboxPublisherAdapter isolatedAdapter = new JdbcOutboxPublisherAdapter(jdbcTemplate, objectMapper, uuidGenerator, true);
+        isolatedAdapter.publish("ordering", "Order", aggId, event);
+
+        ArgumentCaptor<MapSqlParameterSource> isolatedCaptor = ArgumentCaptor.forClass(MapSqlParameterSource.class);
+        verify(jdbcTemplate, times(1)).update(contains("INSERT INTO ordering.outbox_events"), isolatedCaptor.capture());
+
+        MapSqlParameterSource params = isolatedCaptor.getValue();
         assertThat(params.getValue("eventId")).isEqualTo(eventId);
         assertThat(params.getValue("aggType")).isEqualTo("Order");
         assertThat(params.getValue("aggId")).isEqualTo(aggId.toString());
         assertThat(params.getValue("eventType")).isEqualTo(SampleOrderCreatedEvent.class.getName());
         assertThat(params.getValue("payload")).isEqualTo("{\"orderId\":\"" + aggId + "\"}");
+    }
+
+    @Test
+    @DisplayName("should_batch_insert_events_when_publish_all_receives_multiple_events")
+    void should_batch_insert_events_when_publish_all_receives_multiple_events() throws Exception {
+        when(uuidGenerator.generateId()).thenReturn(UUID.randomUUID(), UUID.randomUUID());
+
+        SampleOrderCreatedEvent event1 = new SampleOrderCreatedEvent("order-1");
+        SampleOrderCreatedEvent event2 = new SampleOrderCreatedEvent("order-2");
+        when(objectMapper.writeValueAsString(any())).thenReturn("{\"ok\":true}");
+
+        adapter.publishAll(List.of(event1, event2));
+
+        ArgumentCaptor<SqlParameterSource[]> batchCaptor = ArgumentCaptor.forClass(SqlParameterSource[].class);
+        verify(jdbcTemplate, times(1)).batchUpdate(contains("INSERT INTO shared.outbox_events"), batchCaptor.capture());
+        assertThat(batchCaptor.getValue()).hasSize(2);
     }
 
     @Test
@@ -105,9 +131,10 @@ class JdbcOutboxPublisherAdapterTest {
         SampleOrderCreatedEvent event = new SampleOrderCreatedEvent(aggId.toString());
         when(objectMapper.writeValueAsString(event)).thenReturn("{\"orderId\":\"" + aggId + "\"}");
 
-        adapter.publish("default", "Order", aggId, event);
-        adapter.publish("shared", "Order", aggId, event);
-        adapter.publish("  ", "Order", aggId, event);
+        JdbcOutboxPublisherAdapter isolatedAdapter = new JdbcOutboxPublisherAdapter(jdbcTemplate, objectMapper, uuidGenerator, true);
+        isolatedAdapter.publish("default", "Order", aggId, event);
+        isolatedAdapter.publish("shared", "Order", aggId, event);
+        isolatedAdapter.publish("  ", "Order", aggId, event);
 
         verify(jdbcTemplate, times(3)).update(contains("INSERT INTO shared.outbox_events"), any(MapSqlParameterSource.class));
     }
@@ -128,6 +155,7 @@ class JdbcOutboxPublisherAdapterTest {
         adapter.publishAll(List.of());
 
         verify(jdbcTemplate, never()).update(anyString(), any(MapSqlParameterSource.class));
+        verify(jdbcTemplate, never()).batchUpdate(anyString(), any(SqlParameterSource[].class));
     }
 
     @Test
@@ -139,5 +167,36 @@ class JdbcOutboxPublisherAdapterTest {
         assertThatThrownBy(() -> adapter.publish(event))
                 .isInstanceOf(InfrastructureException.class)
                 .hasMessageContaining("Failed to persist domain event to outbox");
+    }
+
+    @Test
+    @DisplayName("should_batch_insert_with_schema_and_aggregate_metadata_when_isolated_schemas_enabled")
+    void should_batch_insert_with_schema_and_aggregate_metadata_when_isolated_schemas_enabled() throws Exception {
+        UUID aggId = UUID.randomUUID();
+        when(uuidGenerator.generateId()).thenReturn(UUID.randomUUID(), UUID.randomUUID());
+        when(objectMapper.writeValueAsString(any())).thenReturn("{\"ok\":true}");
+
+        JdbcOutboxPublisherAdapter isolatedAdapter = new JdbcOutboxPublisherAdapter(jdbcTemplate, objectMapper, uuidGenerator, true);
+        SampleOrderCreatedEvent event1 = new SampleOrderCreatedEvent(aggId.toString());
+        SampleOrderCreatedEvent event2 = new SampleOrderCreatedEvent(aggId.toString());
+
+        isolatedAdapter.publishAll("ordering", "Order", aggId, List.of(event1, event2));
+
+        ArgumentCaptor<SqlParameterSource[]> batchCaptor = ArgumentCaptor.forClass(SqlParameterSource[].class);
+        verify(jdbcTemplate, times(1)).batchUpdate(contains("INSERT INTO ordering.outbox_events"), batchCaptor.capture());
+        assertThat(batchCaptor.getValue()).hasSize(2);
+        assertThat(batchCaptor.getValue()[0].getValue("aggType")).isEqualTo("Order");
+        assertThat(batchCaptor.getValue()[0].getValue("aggId")).isEqualTo(aggId.toString());
+    }
+
+    @Test
+    @DisplayName("should_throw_validation_exception_when_schema_name_is_invalid")
+    void should_throw_validation_exception_when_schema_name_is_invalid() {
+        JdbcOutboxPublisherAdapter isolatedAdapter = new JdbcOutboxPublisherAdapter(jdbcTemplate, objectMapper, uuidGenerator, true);
+        SampleOrderCreatedEvent event = new SampleOrderCreatedEvent("order-123");
+
+        assertThatThrownBy(() -> isolatedAdapter.publish("invalid-schema!", "Order", UUID.randomUUID(), event))
+                .isInstanceOf(ValidationException.class)
+                .hasMessageContaining("OUTBOX_INVALID_SCHEMA_NAME");
     }
 }

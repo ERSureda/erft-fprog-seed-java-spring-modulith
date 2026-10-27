@@ -79,6 +79,7 @@ class PageResultTest {
         PageResult<Integer> numbers = PageResult.of(List.of(1), 0, 10, 1);
 
         assertThatThrownBy(() -> numbers.map(null))
-                .isInstanceOf(NullPointerException.class);
+                .isInstanceOf(NullPointerException.class)
+                .hasMessage("PAGE_RESULT_MAPPER_CANNOT_BE_NULL");
     }
 }

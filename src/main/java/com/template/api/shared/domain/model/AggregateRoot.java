@@ -8,11 +8,11 @@ import java.util.Objects;
 
 public abstract class AggregateRoot<ID> extends BaseEntity<ID> {
 
-    protected Long version;
+    protected final Long version;
     private transient List<DomainEvent> domainEvents;
 
     protected AggregateRoot(ID id) {
-        super(id);
+        this(id, null);
     }
 
     protected AggregateRoot(ID id, Long version) {

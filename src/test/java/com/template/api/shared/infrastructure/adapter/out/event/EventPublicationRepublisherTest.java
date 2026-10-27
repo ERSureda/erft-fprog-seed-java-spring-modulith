@@ -18,7 +18,7 @@ class EventPublicationRepublisherTest {
     void should_throw_null_pointer_exception_when_dependency_is_null() {
         assertThatThrownBy(() -> new EventPublicationRepublisher(null))
                 .isInstanceOf(NullPointerException.class)
-                .hasMessage("incompletePublications cannot be null");
+                .hasMessage("EVENT_REPUBLISHER_PUBLICATIONS_CANNOT_BE_NULL");
     }
 
     @Test

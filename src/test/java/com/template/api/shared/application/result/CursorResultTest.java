@@ -133,7 +133,7 @@ class CursorResultTest {
 
         assertThatThrownBy(() -> original.map(null))
                 .isInstanceOf(NullPointerException.class)
-                .hasMessage("mapper cannot be null");
+                .hasMessage("CURSOR_RESULT_MAPPER_CANNOT_BE_NULL");
     }
 
     @Test
@@ -143,6 +143,6 @@ class CursorResultTest {
 
         assertThatThrownBy(() -> CursorResult.of(fetched, 1, null))
                 .isInstanceOf(NullPointerException.class)
-                .hasMessage("cursorExtractor cannot be null");
+                .hasMessage("CURSOR_RESULT_EXTRACTOR_CANNOT_BE_NULL");
     }
 }

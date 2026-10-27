@@ -6,13 +6,17 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.dao.DataAccessException;
+import org.springframework.jdbc.core.ConnectionCallback;
 import org.springframework.jdbc.core.JdbcTemplate;
+
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -29,66 +33,100 @@ class PartitionMaintenanceSchedulerTest {
     @Mock
     private JdbcTemplate jdbcTemplate;
 
+    @Mock
+    private Connection connection;
+
+    @Mock
+    private PreparedStatement lockStmt;
+
+    @Mock
+    private PreparedStatement maintainStmt;
+
+    @Mock
+    private PreparedStatement unlockStmt;
+
+    @Mock
+    private ResultSet lockRs;
+
+    @Mock
+    private ResultSet unlockRs;
+
     private PartitionMaintenanceScheduler scheduler;
 
     @BeforeEach
-    void setUp() {
+    @SuppressWarnings("unchecked")
+    void setUp() throws Exception {
         scheduler = new PartitionMaintenanceScheduler(jdbcTemplate, 3, 1);
+        lenient().when(jdbcTemplate.execute(any(ConnectionCallback.class))).thenAnswer(inv -> {
+            ConnectionCallback<Void> callback = inv.getArgument(0);
+            return callback.doInConnection(connection);
+        });
     }
 
     @Test
-    @DisplayName("Should acquire lock, execute procedure, and release lock successfully")
-    void should_acquire_lock_execute_procedure_and_release_lock_successfully() {
-        when(jdbcTemplate.queryForObject(eq(TRY_LOCK_SQL), eq(Boolean.class), eq(ADVISORY_LOCK_ID)))
-                .thenReturn(Boolean.TRUE);
-        when(jdbcTemplate.queryForObject(eq(UNLOCK_SQL), eq(Boolean.class), eq(ADVISORY_LOCK_ID)))
-                .thenReturn(Boolean.TRUE);
+    @DisplayName("Should acquire lock, execute procedure, and release lock on the same connection")
+    void should_acquire_lock_execute_procedure_and_release_lock_successfully() throws Exception {
+        when(connection.prepareStatement(TRY_LOCK_SQL)).thenReturn(lockStmt);
+        when(lockStmt.executeQuery()).thenReturn(lockRs);
+        when(lockRs.next()).thenReturn(true);
+        when(lockRs.getBoolean(1)).thenReturn(true);
+
+        when(connection.prepareStatement(MAINTAIN_PARTITIONS_SQL)).thenReturn(maintainStmt);
+
+        when(connection.prepareStatement(UNLOCK_SQL)).thenReturn(unlockStmt);
 
         assertDoesNotThrow(() -> scheduler.maintainPartitions());
 
-        verify(jdbcTemplate).queryForObject(eq(TRY_LOCK_SQL), eq(Boolean.class), eq(ADVISORY_LOCK_ID));
-        verify(jdbcTemplate).update(eq(MAINTAIN_PARTITIONS_SQL), eq(3), eq(1));
-        verify(jdbcTemplate).queryForObject(eq(UNLOCK_SQL), eq(Boolean.class), eq(ADVISORY_LOCK_ID));
+        verify(lockStmt).setLong(1, ADVISORY_LOCK_ID);
+        verify(maintainStmt).setInt(1, 3);
+        verify(maintainStmt).setInt(2, 1);
+        verify(maintainStmt).execute();
+        verify(unlockStmt).setLong(1, ADVISORY_LOCK_ID);
+        verify(unlockStmt).execute();
     }
 
     @Test
     @DisplayName("Should skip maintenance when advisory lock is already held by another instance")
-    void should_skip_maintenance_when_lock_already_held_by_another_instance() {
-        when(jdbcTemplate.queryForObject(eq(TRY_LOCK_SQL), eq(Boolean.class), eq(ADVISORY_LOCK_ID)))
-                .thenReturn(Boolean.FALSE);
+    void should_skip_maintenance_when_lock_already_held_by_another_instance() throws Exception {
+        when(connection.prepareStatement(TRY_LOCK_SQL)).thenReturn(lockStmt);
+        when(lockStmt.executeQuery()).thenReturn(lockRs);
+        when(lockRs.next()).thenReturn(true);
+        when(lockRs.getBoolean(1)).thenReturn(false);
 
         assertDoesNotThrow(() -> scheduler.maintainPartitions());
 
-        verify(jdbcTemplate).queryForObject(eq(TRY_LOCK_SQL), eq(Boolean.class), eq(ADVISORY_LOCK_ID));
-        verify(jdbcTemplate, never()).update(eq(MAINTAIN_PARTITIONS_SQL), any(), any());
-        verify(jdbcTemplate, never()).queryForObject(eq(UNLOCK_SQL), eq(Boolean.class), eq(ADVISORY_LOCK_ID));
+        verify(connection, never()).prepareStatement(MAINTAIN_PARTITIONS_SQL);
+        verify(connection, never()).prepareStatement(UNLOCK_SQL);
     }
 
     @Test
     @DisplayName("Should catch and handle exception gracefully and still release lock when procedure fails")
-    void should_handle_exception_gracefully_and_release_lock_when_procedure_fails() {
-        when(jdbcTemplate.queryForObject(eq(TRY_LOCK_SQL), eq(Boolean.class), eq(ADVISORY_LOCK_ID)))
-                .thenReturn(Boolean.TRUE);
-        when(jdbcTemplate.update(eq(MAINTAIN_PARTITIONS_SQL), eq(3), eq(1)))
-                .thenThrow(new DataAccessException("Lock acquisition conflict in catalog") {});
+    void should_handle_exception_gracefully_and_release_lock_when_procedure_fails() throws Exception {
+        when(connection.prepareStatement(TRY_LOCK_SQL)).thenReturn(lockStmt);
+        when(lockStmt.executeQuery()).thenReturn(lockRs);
+        when(lockRs.next()).thenReturn(true);
+        when(lockRs.getBoolean(1)).thenReturn(true);
+
+        when(connection.prepareStatement(MAINTAIN_PARTITIONS_SQL)).thenReturn(maintainStmt);
+        when(maintainStmt.execute()).thenThrow(new SQLException("Lock acquisition conflict in catalog"));
+
+        when(connection.prepareStatement(UNLOCK_SQL)).thenReturn(unlockStmt);
 
         assertDoesNotThrow(() -> scheduler.maintainPartitions());
 
-        verify(jdbcTemplate).queryForObject(eq(TRY_LOCK_SQL), eq(Boolean.class), eq(ADVISORY_LOCK_ID));
-        verify(jdbcTemplate).update(eq(MAINTAIN_PARTITIONS_SQL), eq(3), eq(1));
-        verify(jdbcTemplate).queryForObject(eq(UNLOCK_SQL), eq(Boolean.class), eq(ADVISORY_LOCK_ID));
+        verify(maintainStmt).execute();
+        verify(unlockStmt).setLong(1, ADVISORY_LOCK_ID);
+        verify(unlockStmt).execute();
     }
 
     @Test
     @DisplayName("Should handle exception gracefully when lock query itself fails")
-    void should_handle_exception_gracefully_when_lock_query_fails() {
-        when(jdbcTemplate.queryForObject(eq(TRY_LOCK_SQL), eq(Boolean.class), eq(ADVISORY_LOCK_ID)))
-                .thenThrow(new DataAccessException("Connection pool timeout") {});
+    void should_handle_exception_gracefully_when_lock_query_fails() throws Exception {
+        when(connection.prepareStatement(TRY_LOCK_SQL)).thenThrow(new SQLException("Connection pool timeout"));
 
         assertDoesNotThrow(() -> scheduler.maintainPartitions());
 
-        verify(jdbcTemplate).queryForObject(eq(TRY_LOCK_SQL), eq(Boolean.class), eq(ADVISORY_LOCK_ID));
-        verify(jdbcTemplate, never()).update(eq(MAINTAIN_PARTITIONS_SQL), any(), any());
-        verify(jdbcTemplate, never()).queryForObject(eq(UNLOCK_SQL), eq(Boolean.class), any());
+        verify(connection, never()).prepareStatement(MAINTAIN_PARTITIONS_SQL);
+        verify(connection, never()).prepareStatement(UNLOCK_SQL);
     }
 }

@@ -14,7 +14,7 @@ public final class SpringEventPublisherAdapter implements EventPublisherPort {
     private final ApplicationEventPublisher publisher;
 
     public SpringEventPublisherAdapter(ApplicationEventPublisher publisher) {
-        this.publisher = Objects.requireNonNull(publisher, "publisher cannot be null");
+        this.publisher = Objects.requireNonNull(publisher, "EVENT_PUBLISHER_CANNOT_BE_NULL");
     }
 
     @Override

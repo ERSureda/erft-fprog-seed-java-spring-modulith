@@ -34,7 +34,7 @@ public record CursorResult<T>(
         if (itemsWithExtra == null || itemsWithExtra.isEmpty() || limit <= 0) {
             return new CursorResult<>(List.of(), null, false);
         }
-        Objects.requireNonNull(cursorExtractor, "cursorExtractor cannot be null");
+        Objects.requireNonNull(cursorExtractor, "CURSOR_RESULT_EXTRACTOR_CANNOT_BE_NULL");
 
         boolean hasMore = itemsWithExtra.size() > limit;
         List<T> content = hasMore ? itemsWithExtra.subList(0, limit) : itemsWithExtra;
@@ -44,7 +44,7 @@ public record CursorResult<T>(
     }
 
     public <U> CursorResult<U> map(Function<? super T, U> mapper) {
-        Objects.requireNonNull(mapper, "mapper cannot be null");
+        Objects.requireNonNull(mapper, "CURSOR_RESULT_MAPPER_CANNOT_BE_NULL");
         if (items.isEmpty()) {
             return new CursorResult<>(List.of(), nextCursor, hasNext);
         }
