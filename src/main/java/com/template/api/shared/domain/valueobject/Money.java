@@ -98,12 +98,13 @@ public record Money(BigDecimal amount, Currency currency) implements ValueObject
     public boolean equals(Object o) {
         if (this == o) return true;
         if (!(o instanceof Money other)) return false;
-        return this.amount.compareTo(other.amount) == 0 && Objects.equals(this.currency, other.currency);
+        return this.amount.compareTo(other.amount) == 0 && this.currency.equals(other.currency);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(this.amount.stripTrailingZeros(), this.currency);
+        int result = this.amount.stripTrailingZeros().hashCode();
+        return 31 * result + this.currency.hashCode();
     }
 
     @Override

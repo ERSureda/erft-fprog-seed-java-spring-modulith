@@ -192,6 +192,23 @@ class MoneyTest {
 
             assertThat(m1).isNotEqualTo(m2);
         }
+
+        @Test
+        @DisplayName("Should handle equals boundary cases and compute arithmetic hashCode")
+        void should_handle_equals_boundary_cases_and_compute_arithmetic_hash_code() {
+            Money m1 = Money.of(new BigDecimal("10.00"), EUR);
+            Money m2 = Money.of(new BigDecimal("10"), EUR);
+            Money m3 = Money.of(new BigDecimal("20.00"), EUR);
+
+            assertThat(m1.equals(m1)).isTrue();
+            assertThat(m1.equals(null)).isFalse();
+            assertThat(m1.equals("NotAMoney")).isFalse();
+            assertThat(m1.equals(m3)).isFalse();
+
+            int expectedHash = 31 * new BigDecimal("10").stripTrailingZeros().hashCode() + EUR.hashCode();
+            assertThat(m1.hashCode()).isEqualTo(expectedHash);
+            assertThat(m1.hashCode()).isEqualTo(m2.hashCode());
+        }
     }
 
     @Nested

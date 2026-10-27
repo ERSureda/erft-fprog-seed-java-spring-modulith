@@ -97,8 +97,19 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 : statusCode.toString();
 
         return ResponseEntity.status(statusCode).headers(headers).body(
-                new ErrorResponse(statusCode.value(), CommonError.INTERNAL_SERVER_ERROR.code(), detail)
+                new ErrorResponse(statusCode.value(), resolveErrorCode(statusCode), detail)
         );
+    }
+
+    private static String resolveErrorCode(HttpStatusCode statusCode) {
+        return switch (statusCode.value()) {
+            case 404 -> CommonError.RESOURCE_NOT_FOUND.code();
+            case 401 -> CommonError.UNAUTHENTICATED.code();
+            case 403 -> CommonError.FORBIDDEN.code();
+            default -> statusCode.is4xxClientError()
+                    ? CommonError.VALIDATION_FAILED.code()
+                    : CommonError.INTERNAL_SERVER_ERROR.code();
+        };
     }
 
     private FieldViolation mapFieldError(FieldError error) {

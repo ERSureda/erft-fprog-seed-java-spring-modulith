@@ -107,7 +107,7 @@ public class ExecutionContextFilter extends OncePerRequestFilter {
             return Set.of();
         }
         String[] tokens = rawRoles.split(",");
-        Set<String> roles = new HashSet<>();
+        Set<String> roles = HashSet.newHashSet(tokens.length);
         for (String token : tokens) {
             String trimmed = token.trim();
             if (!trimmed.isEmpty()) {

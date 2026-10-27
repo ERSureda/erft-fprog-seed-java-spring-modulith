@@ -9,19 +9,12 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 
-/**
- * Adaptador de infraestructura JDBC para el control transversal de idempotencia.
- * <p>
- * Implementa el patrón Idempotent Consumer sobre {@code shared.processed_events} para garantizar
- * procesamiento exactamente una vez (effectively-once) en arquitecturas dirigidas por eventos (TRX-05).
- * En la fase de monolito modular con Spring Modulith (ADR_002), todos los módulos comparten la tabla técnica
- * centralizada en el esquema {@code shared}.
- */
 @Component
 @RequiredArgsConstructor
 public class JdbcIdempotencyGate implements IdempotencyGate {
 
     private static final String DEFAULT_CONSUMER = "default";
+    private static final String DEFAULT_TABLE = "shared.processed_events";
 
     private static final String SQL_TRY_ACQUIRE = """
         INSERT INTO shared.processed_events (event_id, consumer_name, processed_at)
@@ -46,7 +39,14 @@ public class JdbcIdempotencyGate implements IdempotencyGate {
     @Override
     public boolean tryAcquire(String moduleSchema, UUID eventId, String consumerName) {
         Objects.requireNonNull(eventId, "eventId must not be null");
-        int rows = jdbcTemplate.update(SQL_TRY_ACQUIRE, Map.of(
+        String table = resolveTable(moduleSchema);
+        String sql = DEFAULT_TABLE.equals(table) ? SQL_TRY_ACQUIRE :
+                """
+                INSERT INTO %s (event_id, consumer_name, processed_at)
+                VALUES (:eventId, :consumerName, clock_timestamp())
+                ON CONFLICT (event_id, consumer_name) DO NOTHING
+                """.formatted(table);
+        int rows = jdbcTemplate.update(sql, Map.of(
                 "eventId", eventId,
                 "consumerName", (consumerName != null && !consumerName.isBlank()) ? consumerName : DEFAULT_CONSUMER
         ));
@@ -56,13 +56,18 @@ public class JdbcIdempotencyGate implements IdempotencyGate {
     @Override
     public void release(String moduleSchema, UUID eventId, String consumerName) {
         Objects.requireNonNull(eventId, "eventId must not be null");
+        String table = resolveTable(moduleSchema);
         if (consumerName != null && !consumerName.isBlank()) {
-            jdbcTemplate.update(SQL_RELEASE_BY_CONSUMER, Map.of(
+            String sql = DEFAULT_TABLE.equals(table) ? SQL_RELEASE_BY_CONSUMER :
+                    "DELETE FROM " + table + " WHERE event_id = :eventId AND consumer_name = :consumerName";
+            jdbcTemplate.update(sql, Map.of(
                     "eventId", eventId,
                     "consumerName", consumerName
             ));
         } else {
-            jdbcTemplate.update(SQL_RELEASE_BY_EVENT, Map.of("eventId", eventId));
+            String sql = DEFAULT_TABLE.equals(table) ? SQL_RELEASE_BY_EVENT :
+                    "DELETE FROM " + table + " WHERE event_id = :eventId";
+            jdbcTemplate.update(sql, Map.of("eventId", eventId));
         }
     }
 
@@ -76,11 +81,21 @@ public class JdbcIdempotencyGate implements IdempotencyGate {
     @Override
     public boolean isProcessed(String moduleSchema, UUID eventId) {
         Objects.requireNonNull(eventId, "eventId must not be null");
+        String table = resolveTable(moduleSchema);
+        String sql = DEFAULT_TABLE.equals(table) ? SQL_IS_PROCESSED :
+                "SELECT EXISTS(SELECT 1 FROM " + table + " WHERE event_id = :eventId)";
         Boolean exists = jdbcTemplate.queryForObject(
-                SQL_IS_PROCESSED,
+                sql,
                 Map.of("eventId", eventId),
                 Boolean.class
         );
         return Boolean.TRUE.equals(exists);
+    }
+
+    private String resolveTable(String moduleSchema) {
+        if (moduleSchema != null && !moduleSchema.isBlank() && !"default".equalsIgnoreCase(moduleSchema.trim()) && !"shared".equalsIgnoreCase(moduleSchema.trim())) {
+            return moduleSchema.trim() + ".processed_events";
+        }
+        return DEFAULT_TABLE;
     }
 }

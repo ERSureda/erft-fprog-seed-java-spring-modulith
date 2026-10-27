@@ -59,7 +59,7 @@ class JdbcIdempotencyGateTest {
     @DisplayName("tryAcquire with schema parameter should insert and return true when successful")
     void should_return_true_when_try_acquire_with_module_schema_succeeds() {
         UUID eventId = UUID.randomUUID();
-        when(jdbcTemplate.update(contains("INSERT INTO shared.processed_events"), eq(Map.of(
+        when(jdbcTemplate.update(contains("INSERT INTO ordering.processed_events"), eq(Map.of(
                 "eventId", eventId,
                 "consumerName", "OrderingWorker"
         )))).thenReturn(1);
@@ -73,7 +73,7 @@ class JdbcIdempotencyGateTest {
     @DisplayName("tryAcquire should fallback to default consumer when consumerName is blank or null")
     void should_fallback_to_default_consumer_when_consumer_name_is_blank() {
         UUID eventId = UUID.randomUUID();
-        when(jdbcTemplate.update(contains("INSERT INTO shared.processed_events"), eq(Map.of(
+        when(jdbcTemplate.update(contains("INSERT INTO ordering.processed_events"), eq(Map.of(
                 "eventId", eventId,
                 "consumerName", "default"
         )))).thenReturn(1);
@@ -111,7 +111,7 @@ class JdbcIdempotencyGateTest {
         idempotencyGate.release("ordering", eventId, "OrderingWorker");
 
         verify(jdbcTemplate).update(
-                contains("shared.processed_events WHERE event_id = :eventId AND consumer_name = :consumerName"),
+                contains("ordering.processed_events WHERE event_id = :eventId AND consumer_name = :consumerName"),
                 eq(Map.of("eventId", eventId, "consumerName", "OrderingWorker"))
         );
     }
@@ -124,7 +124,7 @@ class JdbcIdempotencyGateTest {
         idempotencyGate.release("ordering", eventId, null);
 
         verify(jdbcTemplate).update(
-                contains("DELETE FROM shared.processed_events WHERE event_id = :eventId"),
+                contains("DELETE FROM ordering.processed_events WHERE event_id = :eventId"),
                 eq(Map.of("eventId", eventId))
         );
     }
@@ -176,5 +176,17 @@ class JdbcIdempotencyGateTest {
         assertThatThrownBy(() -> idempotencyGate.isProcessed(null))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessageContaining("eventId must not be null");
+    }
+
+    @Test
+    @DisplayName("tryAcquire should fallback to shared table when schema is default or shared or blank")
+    void should_fallback_to_shared_table_when_schema_is_default_or_shared() {
+        UUID eventId = UUID.randomUUID();
+        when(jdbcTemplate.update(contains("INSERT INTO shared.processed_events"), anyMap())).thenReturn(1);
+
+        assertThat(idempotencyGate.tryAcquire("default", eventId, "Worker")).isTrue();
+        assertThat(idempotencyGate.tryAcquire("shared", eventId, "Worker")).isTrue();
+        assertThat(idempotencyGate.tryAcquire("   ", eventId, "Worker")).isTrue();
+        assertThat(idempotencyGate.tryAcquire(null, eventId, "Worker")).isTrue();
     }
 }

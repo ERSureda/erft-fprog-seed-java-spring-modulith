@@ -12,7 +12,6 @@ import org.springframework.stereotype.Component;
 @ConditionalOnBean(JdbcTemplate.class)
 public class PartitionMaintenanceScheduler {
 
-    // Identificador único de 64 bits para el PostgreSQL Advisory Lock de mantenimiento
     private static final long ADVISORY_LOCK_ID = 748291048201L;
     private static final String TRY_LOCK_SQL = "SELECT pg_try_advisory_lock(?)";
     private static final String UNLOCK_SQL = "SELECT pg_advisory_unlock(?)";

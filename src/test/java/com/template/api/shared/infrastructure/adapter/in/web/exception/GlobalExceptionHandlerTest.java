@@ -284,7 +284,7 @@ class GlobalExceptionHandlerTest {
 
             ErrorResponse errorResponse = (ErrorResponse) response.getBody();
             assertThat(errorResponse.status()).isEqualTo(404);
-            assertThat(errorResponse.code()).isEqualTo(CommonError.INTERNAL_SERVER_ERROR.code());
+            assertThat(errorResponse.code()).isEqualTo(CommonError.RESOURCE_NOT_FOUND.code());
             assertThat(errorResponse.detail()).isEqualTo("No endpoint GET /api/v1/unknown found");
             assertThat(errorResponse.errors()).isEmpty();
         }
@@ -302,7 +302,108 @@ class GlobalExceptionHandlerTest {
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
             ErrorResponse errorResponse = (ErrorResponse) response.getBody();
             assertThat(errorResponse.status()).isEqualTo(503);
+            assertThat(errorResponse.code()).isEqualTo(CommonError.INTERNAL_SERVER_ERROR.code());
             assertThat(errorResponse.detail()).isEqualTo("503 SERVICE_UNAVAILABLE");
+        }
+
+        @Test
+        @DisplayName("Should convert 400 Client Error to ErrorResponse with VALIDATION_FAILED")
+        void should_convert_400_problem_detail_to_validation_failed_code() {
+            ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                    HttpStatus.BAD_REQUEST,
+                    "Malformed JSON request body"
+            );
+
+            ResponseEntity<Object> response = handler.createResponseEntity(
+                    problem,
+                    new HttpHeaders(),
+                    HttpStatusCode.valueOf(400),
+                    null
+            );
+
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+            assertThat(response.getBody()).isInstanceOf(ErrorResponse.class);
+
+            ErrorResponse errorResponse = (ErrorResponse) response.getBody();
+            assertThat(errorResponse.status()).isEqualTo(400);
+            assertThat(errorResponse.code()).isEqualTo(CommonError.VALIDATION_FAILED.code());
+            assertThat(errorResponse.detail()).isEqualTo("Malformed JSON request body");
+            assertThat(errorResponse.errors()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("Should convert 401 Client Error to ErrorResponse with UNAUTHENTICATED")
+        void should_convert_401_problem_detail_to_unauthenticated_code() {
+            ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                    HttpStatus.UNAUTHORIZED,
+                    "Authentication credentials required"
+            );
+
+            ResponseEntity<Object> response = handler.createResponseEntity(
+                    problem,
+                    new HttpHeaders(),
+                    HttpStatusCode.valueOf(401),
+                    null
+            );
+
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+            assertThat(response.getBody()).isInstanceOf(ErrorResponse.class);
+
+            ErrorResponse errorResponse = (ErrorResponse) response.getBody();
+            assertThat(errorResponse.status()).isEqualTo(401);
+            assertThat(errorResponse.code()).isEqualTo(CommonError.UNAUTHENTICATED.code());
+            assertThat(errorResponse.detail()).isEqualTo("Authentication credentials required");
+            assertThat(errorResponse.errors()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("Should convert 403 Client Error to ErrorResponse with FORBIDDEN")
+        void should_convert_403_problem_detail_to_forbidden_code() {
+            ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                    HttpStatus.FORBIDDEN,
+                    "Access denied to resource"
+            );
+
+            ResponseEntity<Object> response = handler.createResponseEntity(
+                    problem,
+                    new HttpHeaders(),
+                    HttpStatusCode.valueOf(403),
+                    null
+            );
+
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+            assertThat(response.getBody()).isInstanceOf(ErrorResponse.class);
+
+            ErrorResponse errorResponse = (ErrorResponse) response.getBody();
+            assertThat(errorResponse.status()).isEqualTo(403);
+            assertThat(errorResponse.code()).isEqualTo(CommonError.FORBIDDEN.code());
+            assertThat(errorResponse.detail()).isEqualTo("Access denied to resource");
+            assertThat(errorResponse.errors()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("Should convert 500 Server Error to ErrorResponse with INTERNAL_SERVER_ERROR")
+        void should_convert_500_problem_detail_to_internal_server_error_code() {
+            ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                    HttpStatus.INTERNAL_SERVER_ERROR,
+                    "An unexpected error occurred"
+            );
+
+            ResponseEntity<Object> response = handler.createResponseEntity(
+                    problem,
+                    new HttpHeaders(),
+                    HttpStatusCode.valueOf(500),
+                    null
+            );
+
+            assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
+            assertThat(response.getBody()).isInstanceOf(ErrorResponse.class);
+
+            ErrorResponse errorResponse = (ErrorResponse) response.getBody();
+            assertThat(errorResponse.status()).isEqualTo(500);
+            assertThat(errorResponse.code()).isEqualTo(CommonError.INTERNAL_SERVER_ERROR.code());
+            assertThat(errorResponse.detail()).isEqualTo("An unexpected error occurred");
+            assertThat(errorResponse.errors()).isEmpty();
         }
     }
 

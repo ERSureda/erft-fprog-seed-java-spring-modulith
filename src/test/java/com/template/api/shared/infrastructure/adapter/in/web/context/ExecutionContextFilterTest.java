@@ -159,6 +159,27 @@ class ExecutionContextFilterTest {
     }
 
     @Test
+    @DisplayName("Should parse multiple roles with spaces and empty tokens safely")
+    void should_parse_multiple_roles_with_spaces_and_empty_tokens() throws ServletException, IOException {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.addHeader(ApiHeaders.ROLES, "ROLE_ADMIN, , ROLE_USER , , ROLE_MANAGER");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        AtomicReference<ExecutionContext> contextInChain = new AtomicReference<>();
+
+        MockFilterChain filterChain = new MockFilterChain() {
+            @Override
+            public void doFilter(jakarta.servlet.ServletRequest req, jakarta.servlet.ServletResponse res) {
+                contextInChain.set(ExecutionContextHolder.get());
+            }
+        };
+
+        filter.doFilter(request, response, filterChain);
+
+        assertThat(contextInChain.get().roles()).containsExactlyInAnyOrder("ROLE_ADMIN", "ROLE_USER", "ROLE_MANAGER");
+    }
+
+    @Test
     @DisplayName("Should always clear context and MDC even when filter chain throws an exception")
     void should_always_clear_context_when_filter_chain_throws_exception() {
         MockHttpServletRequest request = new MockHttpServletRequest();

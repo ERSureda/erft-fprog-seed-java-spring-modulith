@@ -85,7 +85,7 @@ class JdbcOutboxPublisherAdapterTest {
         adapter.publish("ordering", "Order", aggId, event);
 
         ArgumentCaptor<MapSqlParameterSource> captor = ArgumentCaptor.forClass(MapSqlParameterSource.class);
-        verify(jdbcTemplate, times(1)).update(contains("INSERT INTO shared.outbox_events"), captor.capture());
+        verify(jdbcTemplate, times(1)).update(contains("INSERT INTO ordering.outbox_events"), captor.capture());
 
         MapSqlParameterSource params = captor.getValue();
         assertThat(params.getValue("eventId")).isEqualTo(eventId);
@@ -93,6 +93,23 @@ class JdbcOutboxPublisherAdapterTest {
         assertThat(params.getValue("aggId")).isEqualTo(aggId.toString());
         assertThat(params.getValue("eventType")).isEqualTo(SampleOrderCreatedEvent.class.getName());
         assertThat(params.getValue("payload")).isEqualTo("{\"orderId\":\"" + aggId + "\"}");
+    }
+
+    @Test
+    @DisplayName("should_fallback_to_shared_outbox_when_schema_is_default_or_shared_or_blank")
+    void should_fallback_to_shared_outbox_when_schema_is_default_or_shared_or_blank() throws Exception {
+        UUID eventId = UUID.randomUUID();
+        UUID aggId = UUID.randomUUID();
+        when(uuidGenerator.generateId()).thenReturn(eventId);
+
+        SampleOrderCreatedEvent event = new SampleOrderCreatedEvent(aggId.toString());
+        when(objectMapper.writeValueAsString(event)).thenReturn("{\"orderId\":\"" + aggId + "\"}");
+
+        adapter.publish("default", "Order", aggId, event);
+        adapter.publish("shared", "Order", aggId, event);
+        adapter.publish("  ", "Order", aggId, event);
+
+        verify(jdbcTemplate, times(3)).update(contains("INSERT INTO shared.outbox_events"), any(MapSqlParameterSource.class));
     }
 
     @Test
