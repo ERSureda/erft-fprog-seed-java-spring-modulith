@@ -2,8 +2,8 @@
 name: generate-db-migration
 description: >-
   Genera exclusivamente scripts DDL de migración Flyway inmutables para PostgreSQL 17
-  (V<N>__init_<module_id>_tables.sql o evolutivas V<N>__<verbo>_<desc>.sql) formateados
-  a 80 columnas con aislamiento de esquema, tipos ENUM nativos, UUIDv7, concurrencia optimista,
+  (V<N>__init_<module_id>_tables.sql o evolutivas V<N>__<verbo>_<desc>.sql) con aislamiento
+  de esquema, tipos ENUM nativos, UUIDv7, concurrencia optimista,
   fillfactor = 90, políticas RLS y cero claves foráneas intermodulares.
 ---
 
@@ -40,9 +40,9 @@ description: >-
       - `CONSTRAINT chk_<tabla>_deleted_coherence CHECK (deleted_at IS NULL OR deleted_at >= created_at)`
     * Tabulación y alineación visual limpia en columnas para campos y constraints.
     * Cerrar toda tabla de negocio con `) WITH (fillfactor = 90);` (o `fillfactor = 85` en entidades subordinadas de alta rotación).
-4. **Sistema de Comentarios Estructurales en 3 Niveles a 80 Columnas (`OUT-07`)**:
-    * **Nivel 1**: Banner superior de 80 caracteres exactos (`-- =============================================================================`).
-    * **Nivel 2**: Divisores de sección numerados de 80 caracteres exactos (`-- -----------------------------------------------------------------------------`).
+4. **Sistema de Comentarios Estructurales en 3 Niveles (`OUT-07`)**:
+    * **Nivel 1**: Banner superior (`-- =============================================================================`).
+    * **Nivel 2**: Divisores de sección numerados (`-- -----------------------------------------------------------------------------`).
     * **Nivel 3**: Sub-bloques (`-- Índices operativos y de unicidad`, `-- Índices de entidad subordinada`).
     * **Sentencias DDL `COMMENT ON`**: **PROHIBIDAS** / Omitidas (no declarar `COMMENT ON TABLE` ni `COMMENT ON COLUMN` para mantener los scripts DDL limpios, evitar fallos de codificación de caracteres y simplificar la mantenibilidad).
 5. **Centralización de Infraestructura en Monolito (`OUT-08`, `TRX-03`, `TRX-05`, `SHR-03`)**:
