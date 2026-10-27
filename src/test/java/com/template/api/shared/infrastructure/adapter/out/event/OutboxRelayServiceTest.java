@@ -10,6 +10,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 
 import java.util.List;
@@ -22,7 +23,10 @@ import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -55,10 +59,11 @@ class OutboxRelayServiceTest {
         service.processPendingEvents();
 
         verify(eventPublisherPort, never()).publish(any());
+        verify(jdbcTemplate, never()).update(anyString(), anyMap());
     }
 
     @Test
-    @DisplayName("Should transition to PROCESSING, publish domain event, and transition to DELIVERED")
+    @DisplayName("Should claim in batch, publish domain event, and transition to DELIVERED individually")
     void should_transition_status_and_publish_event_when_pending_events_exist() throws Exception {
         UUID eventId = UUID.randomUUID();
         TestOutboxEvent event = new TestOutboxEvent("agg-1");
@@ -75,13 +80,198 @@ class OutboxRelayServiceTest {
 
         service.processPendingEvents();
 
-        verify(jdbcTemplate).update(contains("status = 'PROCESSING'"), eq(Map.of("id", eventId)));
+        verify(jdbcTemplate).update(contains("status = 'PROCESSING'"), eq(Map.of("ids", List.of(eventId))));
 
         ArgumentCaptor<DomainEvent> eventCaptor = ArgumentCaptor.forClass(DomainEvent.class);
         verify(eventPublisherPort).publish(eventCaptor.capture());
         assertThat(eventCaptor.getValue().aggregateId()).isEqualTo("agg-1");
 
         verify(jdbcTemplate).update(contains("status = 'DELIVERED'"), eq(Map.of("id", eventId)));
+    }
+
+    @Test
+    @DisplayName("Should claim multiple events in a single batch and settle each individually")
+    void should_claim_multiple_events_in_batch_and_settle_each_individually() throws Exception {
+        UUID eventId1 = UUID.randomUUID();
+        UUID eventId2 = UUID.randomUUID();
+
+        TestOutboxEvent event1 = new TestOutboxEvent("agg-1");
+        TestOutboxEvent event2 = new TestOutboxEvent("agg-2");
+
+        Map<String, Object> row1 = Map.of(
+                "event_id", eventId1,
+                "event_type", TestOutboxEvent.class.getName(),
+                "payload", objectMapper.writeValueAsString(event1),
+                "retry_count", 0
+        );
+        Map<String, Object> row2 = Map.of(
+                "event_id", eventId2,
+                "event_type", TestOutboxEvent.class.getName(),
+                "payload", objectMapper.writeValueAsString(event2),
+                "retry_count", 0
+        );
+
+        when(jdbcTemplate.queryForList(anyString(), anyMap())).thenReturn(List.of(row1, row2));
+
+        service.processPendingEvents();
+
+        verify(jdbcTemplate).update(contains("status = 'PROCESSING'"), eq(Map.of("ids", List.of(eventId1, eventId2))));
+
+        verify(eventPublisherPort, times(2)).publish(any(DomainEvent.class));
+        verify(jdbcTemplate).update(contains("status = 'DELIVERED'"), eq(Map.of("id", eventId1)));
+        verify(jdbcTemplate).update(contains("status = 'DELIVERED'"), eq(Map.of("id", eventId2)));
+    }
+
+    @Test
+    @DisplayName("Should mark FAILED with exponential backoff when event publication fails")
+    void should_mark_failed_with_exponential_backoff_when_publishing_throws_exception() throws Exception {
+        UUID eventId = UUID.randomUUID();
+        TestOutboxEvent event = new TestOutboxEvent("agg-fail");
+        String payloadJson = objectMapper.writeValueAsString(event);
+
+        Map<String, Object> row = Map.of(
+                "event_id", eventId,
+                "event_type", TestOutboxEvent.class.getName(),
+                "payload", payloadJson,
+                "retry_count", 1
+        );
+
+        when(jdbcTemplate.queryForList(anyString(), anyMap())).thenReturn(List.of(row));
+        doThrow(new RuntimeException("External broker unreachable")).when(eventPublisherPort).publish(any());
+
+        service.processPendingEvents();
+
+        verify(jdbcTemplate).update(contains("status = 'PROCESSING'"), eq(Map.of("ids", List.of(eventId))));
+        verify(jdbcTemplate, never()).update(contains("status = 'DELIVERED'"), anyMap());
+
+        verify(jdbcTemplate).update(
+                contains("SET status = CASE WHEN :nextRetry >= :maxRetries THEN 'DEAD_LETTER' ELSE 'FAILED' END"),
+                eq(Map.of(
+                        "id", eventId,
+                        "nextRetry", 2,
+                        "maxRetries", 5,
+                        "error", "External broker unreachable",
+                        "delay", 4L
+                ))
+        );
+    }
+
+    @Test
+    @DisplayName("Should route to DEAD_LETTER when retry limit is reached")
+    void should_transition_to_dead_letter_when_retry_limit_reached() throws Exception {
+        UUID eventId = UUID.randomUUID();
+        TestOutboxEvent event = new TestOutboxEvent("agg-dlq");
+        String payloadJson = objectMapper.writeValueAsString(event);
+
+        Map<String, Object> row = Map.of(
+                "event_id", eventId,
+                "event_type", TestOutboxEvent.class.getName(),
+                "payload", payloadJson,
+                "retry_count", 4
+        );
+
+        when(jdbcTemplate.queryForList(anyString(), anyMap())).thenReturn(List.of(row));
+        doThrow(new RuntimeException("Terminal failure")).when(eventPublisherPort).publish(any());
+
+        service.processPendingEvents();
+
+        verify(jdbcTemplate).update(
+                contains("SET status = CASE WHEN :nextRetry >= :maxRetries THEN 'DEAD_LETTER' ELSE 'FAILED' END"),
+                eq(Map.of(
+                        "id", eventId,
+                        "nextRetry", 5,
+                        "maxRetries", 5,
+                        "error", "Terminal failure",
+                        "delay", 32L
+                ))
+        );
+    }
+
+    @Test
+    @DisplayName("Should isolate event settlements so failure of one event does not affect another")
+    void should_handle_partial_batch_failure_without_affecting_other_events() throws Exception {
+        UUID eventId1 = UUID.randomUUID();
+        UUID eventId2 = UUID.randomUUID();
+
+        TestOutboxEvent event1 = new TestOutboxEvent("agg-ok");
+        TestOutboxEvent event2 = new TestOutboxEvent("agg-fail");
+
+        Map<String, Object> row1 = Map.of(
+                "event_id", eventId1,
+                "event_type", TestOutboxEvent.class.getName(),
+                "payload", objectMapper.writeValueAsString(event1),
+                "retry_count", 0
+        );
+        Map<String, Object> row2 = Map.of(
+                "event_id", eventId2,
+                "event_type", TestOutboxEvent.class.getName(),
+                "payload", objectMapper.writeValueAsString(event2),
+                "retry_count", 0
+        );
+
+        when(jdbcTemplate.queryForList(anyString(), anyMap())).thenReturn(List.of(row1, row2));
+        doAnswer(invocation -> {
+            DomainEvent arg = invocation.getArgument(0);
+            if ("agg-fail".equals(arg.aggregateId())) {
+                throw new RuntimeException("Network glitch");
+            }
+            return null;
+        }).when(eventPublisherPort).publish(any());
+
+        service.processPendingEvents();
+
+        verify(jdbcTemplate).update(contains("status = 'DELIVERED'"), eq(Map.of("id", eventId1)));
+        verify(jdbcTemplate).update(
+                contains("SET status = CASE WHEN :nextRetry >= :maxRetries THEN 'DEAD_LETTER' ELSE 'FAILED' END"),
+                eq(Map.of(
+                        "id", eventId2,
+                        "nextRetry", 1,
+                        "maxRetries", 5,
+                        "error", "Network glitch",
+                        "delay", 2L
+                ))
+        );
+    }
+
+    @Test
+    @DisplayName("Should mark FAILED when event class cannot be resolved")
+    void should_mark_failed_when_event_class_resolution_fails() {
+        UUID eventId = UUID.randomUUID();
+
+        Map<String, Object> row = Map.of(
+                "event_id", eventId,
+                "event_type", "com.template.unknown.NonExistentEvent",
+                "payload", "{}",
+                "retry_count", 0
+        );
+
+        when(jdbcTemplate.queryForList(anyString(), anyMap())).thenReturn(List.of(row));
+
+        service.processPendingEvents();
+
+        verify(eventPublisherPort, never()).publish(any());
+        verify(jdbcTemplate).update(
+                contains("SET status = CASE WHEN :nextRetry >= :maxRetries THEN 'DEAD_LETTER' ELSE 'FAILED' END"),
+                eq(Map.of(
+                        "id", eventId,
+                        "nextRetry", 1,
+                        "maxRetries", 5,
+                        "error", "com.template.unknown.NonExistentEvent",
+                        "delay", 2L
+                ))
+        );
+    }
+
+    @Test
+    @DisplayName("Should handle database failure during claim phase gracefully without throwing")
+    void should_handle_database_failure_during_claim_phase_gracefully() {
+        when(jdbcTemplate.queryForList(anyString(), anyMap()))
+                .thenThrow(new DataAccessResourceFailureException("Database unreachable"));
+
+        service.processPendingEvents();
+
+        verify(eventPublisherPort, never()).publish(any());
+        verify(jdbcTemplate, never()).update(contains("status = 'PROCESSING'"), anyMap());
     }
 
     @Test

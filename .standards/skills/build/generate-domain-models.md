@@ -23,7 +23,7 @@ description: >-
     * Raíz del agregado: `src/main/java/<base>/<module_id>/domain/model/<AggregateRoot>.java` (extiende `AggregateRoot<UUID>`).
     * Entidad hija (si aplica): `src/main/java/<base>/<module_id>/domain/model/<SubordinateEntity>.java` (extiende `BaseEntity<UUID>`).
     * **PROHIBIDO** crear o modificar ningún otro archivo (ni eventos, ni excepciones, ni servicios, ni mappers, ni repositorios).
-    * **PROHIBIDO** incluir métodos de mutación, transiciones de estado, predicados FSM ni lógica de negocio dentro del modelo.
+    * **PROHIBIDO** incluir métodos de mutación, transiciones de estado, predicados FSM ni lógica de negocio dentro del modelo durante la fase inicial de andamiaje (en modelos de agregados ya evolucionados, como la referencia de producción `Order.java`, se autoriza la inclusión de la FSM `DOM-03` y eventos `DOM-05` manteniendo pureza absoluta `DOM-01`).
 
 ## 2. REGLAS INMUTABLES (`DOM-01`, `DOM-02`, `DOM-04`, `TRX-02`, `SHR-04`, `SHR-05`)
 
@@ -33,7 +33,7 @@ description: >-
     * **Exactamente 2 Secciones delimitadas por**:
         * `    // --- Constructors & Factories ---`
         * `    // --- Getters ---`
-    * **PROHIBIDO incluir sección o métodos de lógica de negocio**: Cero métodos de transición FSM (`can<Action>()`), métodos mutadores (`<action>()`), o registro de eventos de dominio (`registerEvent(...)`).
+    * **PROHIBIDO incluir sección o métodos de lógica de negocio en la fase de andamiaje inicial**: Cero métodos de transición FSM (`can<Action>()`), métodos mutadores (`<action>()`), o registro de eventos de dominio (`registerEvent(...)`) en el andamiaje base; en etapas maduras del Bounded Context, estos métodos se integran entre las factorías y los getters preservando la pureza tecnológica `DOM-01`.
 3. **Constructores Privados y Factorías (`DOM-02`, `TRX-02`, `SHR-04`)**:
     * Constructor `private` que invoca `super(id, version);` en un `AggregateRoot<UUID>` o `super(id);` en una entidad subordinada (`BaseEntity<UUID>`) en la primera línea, y valida todo campo obligatorio con `Objects.requireNonNull(campo, "<ENTIDAD>_<CAMPO>_CANNOT_BE_NULL")` en el orden exacto de declaración. (Campos nullable en BD se asignan directamente sin `requireNonNull`).
     * `public static <Model> create(...)`: Inicializa `Instant now = Instant.now();`, instancia con estado inicial (si aplica), `version = 0L` (solo en `AggregateRoot<UUID>`; las entidades subordinadas `BaseEntity<UUID>` no tienen `version`), `createdAt = now`, `updatedAt = now` y retorna la instancia (sin registrar eventos de dominio ni ejecutar lógica adicional).
@@ -203,4 +203,4 @@ Ejecutar en terminal antes de finalizar:
 3. Emitir informe final conciso:
     * **Generados**: `<AggregateRoot>` / `<SubordinateEntity>` con lista de atributos y firmas de `create(...)` y `reconstruct(...)`.
     * **Intactos (preexistentes)**.
-    * **Recordatorio `DOM-03` / `DOM-05`**: Queda pendiente incorporar los predicados FSM (`can*()`), métodos de negocio y registro de `DomainEvent` en una fase posterior.
+    * **Evolución `DOM-03` / `DOM-05`**: En modelos que ya cuentan con lógica de negocio y eventos (como `Order.java`), verificar que los predicados FSM (`can*()`) y mutadores mantengan pureza absoluta Java 21 sin dependencias externas.

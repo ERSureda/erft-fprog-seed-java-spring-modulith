@@ -21,6 +21,6 @@ public record CreateOrderHttpRequest(
 ) {
 
     public CreateOrderCommand toCommand() {
-        return new CreateOrderCommand(null, this.amount, this.currency);
+        return new CreateOrderCommand(this.amount, this.currency);
     }
 }

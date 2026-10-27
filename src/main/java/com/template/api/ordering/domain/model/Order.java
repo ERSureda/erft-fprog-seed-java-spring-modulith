@@ -107,7 +107,7 @@ public class Order extends AggregateRoot<UUID> {
     }
 
     public boolean canCancel() {
-        return this.status != OrderStatus.SHIPPED && this.status != OrderStatus.CANCELLED;
+        return !this.status.isTerminal();
     }
 
     public void cancel() {
