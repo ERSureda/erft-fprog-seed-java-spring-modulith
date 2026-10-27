@@ -15,12 +15,12 @@ java {
 
 tasks.withType(JavaCompile).configureEach {
 	options.encoding = 'UTF-8'
-	options.compilerArgs.addAll([
+	options.compilerArgs += [
 		'-parameters',
 		'-Xlint:all',
 		'-Xlint:-processing',
 		'-Xlint:-serial'
-	])
+	]
 }
 
 repositories {
@@ -32,7 +32,7 @@ ext {
 	set('testcontainersVersion', '1.20.5')
 	set('archunitVersion', '1.4.1')
 	set('springdocVersion', '2.8.5')
-	set('awaitilityVersion', '4.2.2')
+	set('awaitilityVersion', '4.3.0')
 }
 
 dependencyManagement {
@@ -61,7 +61,6 @@ dependencies {
 	// ==========================================
 	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
 	implementation 'org.springframework.boot:spring-boot-starter-flyway'
-	implementation 'org.flywaydb:flyway-core'
 	implementation 'org.flywaydb:flyway-database-postgresql'
 	runtimeOnly 'org.postgresql:postgresql'
 
@@ -69,7 +68,6 @@ dependencies {
 	// 4. Observability & Production Actuator
 	// ==========================================
 	implementation 'org.springframework.boot:spring-boot-starter-actuator'
-	implementation 'io.micrometer:micrometer-core'
 	runtimeOnly 'io.micrometer:micrometer-registry-prometheus'
 
 	// ==========================================
@@ -101,15 +99,30 @@ dependencies {
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
+tasks.named('bootJar') {
+	archiveFileName = 'app.jar'
+}
+
+tasks.named('jar') {
+	enabled = false
+}
+
 tasks.named('test') {
 	useJUnitPlatform()
+	jvmArgs('-XX:+EnableDynamicAgentLoading')
+	systemProperty 'file.encoding', 'UTF-8'
+
 	testLogging {
 		events 'passed', 'skipped', 'failed'
+		exceptionFormat = 'full'
+		showExceptions = true
+		showCauses = true
+		showStackTraces = true
 	}
 }
 
 // ==========================================
-// PROTOCOLO syncStandards: Descarga atómica inmutable
+// PROTOCOLO syncStandards: Descarga atómica inmutable con timeout
 // ==========================================
 tasks.register('syncStandards') {
 	group = 'fprog'
@@ -126,12 +139,19 @@ tasks.register('syncStandards') {
 			adrsDir.mkdirs()
 		}
 
+		def downloadWithTimeout = { String urlStr ->
+			def conn = new URL(urlStr).openConnection()
+			conn.setConnectTimeout(10000)
+			conn.setReadTimeout(10000)
+			return conn.getInputStream().text
+		}
+
 		['ARCHITECTURE.md', 'EXCEPTIONS.md', 'TESTING.md', 'dag-manifest.yaml'].each { fileName ->
 			def destFile = new File(targetDir, fileName)
 			def url = "${baseUrl}/${fileName}"
 			println "Descargando ${url} -> ${destFile.path}..."
 			try {
-				destFile.text = new URL(url).text
+				destFile.text = downloadWithTimeout(url)
 			} catch (Exception ex) {
 				println "Aviso: No se pudo descargar ${fileName} desde ${url}: ${ex.message}"
 			}
@@ -143,7 +163,7 @@ tasks.register('syncStandards') {
 			def url = "${baseUrl}/adrs/${adrName}"
 			println "Descargando ${url} -> ${destFile.path}..."
 			try {
-				destFile.text = new URL(url).text
+				destFile.text = downloadWithTimeout(url)
 			} catch (Exception ex) {
 				println "Aviso: No se pudo descargar ${adrName} desde ${url}: ${ex.message}"
 			}

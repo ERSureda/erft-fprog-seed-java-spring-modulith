@@ -3,11 +3,12 @@ services:
     image: postgres:17-alpine
     container_name: erfp-postgres-local
     environment:
-      POSTGRES_DB: template_dev
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ${POSTGRES_DB:-template_dev}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
     ports:
       - "5432:5432"
+    shm_size: 128mb
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -15,6 +16,30 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - erfp-network
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: erfp-api-local
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/template_dev
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - erfp-network
 
 volumes:
   postgres_data:
+
+networks:
+  erfp-network:
+    driver: bridge
