@@ -53,7 +53,7 @@ class JdbcOutboxPublisherAdapterTest {
     }
 
     @Test
-    @DisplayName("should_publish_single_event_when_valid")
+    @DisplayName("Should publish single event to shared outbox when valid")
     void should_publish_single_event_when_valid() throws Exception {
         UUID eventId = UUID.randomUUID();
         when(uuidGenerator.generateId()).thenReturn(eventId);
@@ -75,7 +75,7 @@ class JdbcOutboxPublisherAdapterTest {
     }
 
     @Test
-    @DisplayName("should_route_to_shared_outbox_in_monolith_mode_and_module_outbox_when_isolated_schemas_enabled")
+    @DisplayName("Should route to shared outbox in monolith mode and module outbox when isolated schemas enabled")
     void should_publish_canonical_signature_when_schema_and_aggregate_details_provided() throws Exception {
         UUID eventId = UUID.randomUUID();
         UUID aggId = UUID.randomUUID();
@@ -106,7 +106,7 @@ class JdbcOutboxPublisherAdapterTest {
     }
 
     @Test
-    @DisplayName("should_batch_insert_events_when_publish_all_receives_multiple_events")
+    @DisplayName("Should batch insert events when publishAll receives multiple events")
     void should_batch_insert_events_when_publish_all_receives_multiple_events() throws Exception {
         when(uuidGenerator.generateId()).thenReturn(UUID.randomUUID(), UUID.randomUUID());
 
@@ -122,7 +122,7 @@ class JdbcOutboxPublisherAdapterTest {
     }
 
     @Test
-    @DisplayName("should_fallback_to_shared_outbox_when_schema_is_default_or_shared_or_blank")
+    @DisplayName("Should fallback to shared outbox when schema is default or shared or blank")
     void should_fallback_to_shared_outbox_when_schema_is_default_or_shared_or_blank() throws Exception {
         UUID eventId = UUID.randomUUID();
         UUID aggId = UUID.randomUUID();
@@ -140,7 +140,7 @@ class JdbcOutboxPublisherAdapterTest {
     }
 
     @Test
-    @DisplayName("should_do_nothing_when_event_is_null")
+    @DisplayName("Should do nothing when event is null")
     void should_do_nothing_when_event_is_null() {
         adapter.publish(null);
         adapter.publish("ordering", "Order", UUID.randomUUID(), null);
@@ -149,7 +149,7 @@ class JdbcOutboxPublisherAdapterTest {
     }
 
     @Test
-    @DisplayName("should_do_nothing_when_events_list_is_null_or_empty")
+    @DisplayName("Should do nothing when events list is null or empty")
     void should_do_nothing_when_events_list_is_null_or_empty() {
         adapter.publishAll(null);
         adapter.publishAll(List.of());
@@ -159,7 +159,7 @@ class JdbcOutboxPublisherAdapterTest {
     }
 
     @Test
-    @DisplayName("should_throw_infrastructure_exception_when_serialization_fails")
+    @DisplayName("Should throw InfrastructureException when serialization fails")
     void should_throw_infrastructure_exception_when_serialization_fails() throws Exception {
         SampleOrderCreatedEvent event = new SampleOrderCreatedEvent("order-123");
         when(objectMapper.writeValueAsString(event)).thenThrow(new JsonProcessingException("Serialization error") {});
@@ -170,7 +170,7 @@ class JdbcOutboxPublisherAdapterTest {
     }
 
     @Test
-    @DisplayName("should_batch_insert_with_schema_and_aggregate_metadata_when_isolated_schemas_enabled")
+    @DisplayName("Should batch insert with schema and aggregate metadata when isolated schemas enabled")
     void should_batch_insert_with_schema_and_aggregate_metadata_when_isolated_schemas_enabled() throws Exception {
         UUID aggId = UUID.randomUUID();
         when(uuidGenerator.generateId()).thenReturn(UUID.randomUUID(), UUID.randomUUID());
@@ -190,7 +190,7 @@ class JdbcOutboxPublisherAdapterTest {
     }
 
     @Test
-    @DisplayName("should_throw_validation_exception_when_schema_name_is_invalid")
+    @DisplayName("Should throw ValidationException when schema name is invalid")
     void should_throw_validation_exception_when_schema_name_is_invalid() {
         JdbcOutboxPublisherAdapter isolatedAdapter = new JdbcOutboxPublisherAdapter(jdbcTemplate, objectMapper, uuidGenerator, true);
         SampleOrderCreatedEvent event = new SampleOrderCreatedEvent("order-123");

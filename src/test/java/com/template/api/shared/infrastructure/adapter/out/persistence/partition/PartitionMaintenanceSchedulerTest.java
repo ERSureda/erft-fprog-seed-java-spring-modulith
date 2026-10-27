@@ -14,7 +14,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
@@ -65,7 +65,7 @@ class PartitionMaintenanceSchedulerTest {
 
     @Test
     @DisplayName("Should acquire lock, execute procedure, and release lock on the same connection")
-    void should_acquire_lock_execute_procedure_and_release_lock_successfully() throws Exception {
+    void should_acquire_lock_and_execute_procedure_when_maintenance_triggered() throws Exception {
         when(connection.prepareStatement(TRY_LOCK_SQL)).thenReturn(lockStmt);
         when(lockStmt.executeQuery()).thenReturn(lockRs);
         when(lockRs.next()).thenReturn(true);
@@ -75,7 +75,7 @@ class PartitionMaintenanceSchedulerTest {
 
         when(connection.prepareStatement(UNLOCK_SQL)).thenReturn(unlockStmt);
 
-        assertDoesNotThrow(() -> scheduler.maintainPartitions());
+        assertThatCode(() -> scheduler.maintainPartitions()).doesNotThrowAnyException();
 
         verify(lockStmt).setLong(1, ADVISORY_LOCK_ID);
         verify(maintainStmt).setInt(1, 3);
@@ -93,7 +93,7 @@ class PartitionMaintenanceSchedulerTest {
         when(lockRs.next()).thenReturn(true);
         when(lockRs.getBoolean(1)).thenReturn(false);
 
-        assertDoesNotThrow(() -> scheduler.maintainPartitions());
+        assertThatCode(() -> scheduler.maintainPartitions()).doesNotThrowAnyException();
 
         verify(connection, never()).prepareStatement(MAINTAIN_PARTITIONS_SQL);
         verify(connection, never()).prepareStatement(UNLOCK_SQL);
@@ -112,7 +112,7 @@ class PartitionMaintenanceSchedulerTest {
 
         when(connection.prepareStatement(UNLOCK_SQL)).thenReturn(unlockStmt);
 
-        assertDoesNotThrow(() -> scheduler.maintainPartitions());
+        assertThatCode(() -> scheduler.maintainPartitions()).doesNotThrowAnyException();
 
         verify(maintainStmt).execute();
         verify(unlockStmt).setLong(1, ADVISORY_LOCK_ID);
@@ -124,7 +124,7 @@ class PartitionMaintenanceSchedulerTest {
     void should_handle_exception_gracefully_when_lock_query_fails() throws Exception {
         when(connection.prepareStatement(TRY_LOCK_SQL)).thenThrow(new SQLException("Connection pool timeout"));
 
-        assertDoesNotThrow(() -> scheduler.maintainPartitions());
+        assertThatCode(() -> scheduler.maintainPartitions()).doesNotThrowAnyException();
 
         verify(connection, never()).prepareStatement(MAINTAIN_PARTITIONS_SQL);
         verify(connection, never()).prepareStatement(UNLOCK_SQL);

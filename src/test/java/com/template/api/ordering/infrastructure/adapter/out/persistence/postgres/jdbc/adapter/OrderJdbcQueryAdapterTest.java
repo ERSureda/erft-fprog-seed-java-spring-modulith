@@ -32,7 +32,7 @@ class OrderJdbcQueryAdapterTest extends AbstractPostgresIntegrationTest {
     private NamedParameterJdbcTemplate jdbcTemplate;
 
     @Test
-    @DisplayName("should_project_order_result_directly_from_database_when_order_exists")
+    @DisplayName("Should project order result directly from database when order exists")
     void should_project_order_result_directly_from_database_when_order_exists() {
         UUID orderId = UUID.randomUUID();
         UUID tenantId = UUID.randomUUID();

@@ -48,7 +48,7 @@ class CreateOrderServiceTest {
     private CreateOrderService createOrderService;
 
     @Test
-    @DisplayName("should_create_order_and_persist_when_command_is_valid")
+    @DisplayName("Should create order and persist via repository port when command is valid")
     void should_create_order_and_persist_when_command_is_valid() {
         UUID tenantId = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
@@ -80,7 +80,7 @@ class CreateOrderServiceTest {
     }
 
     @Test
-    @DisplayName("should_use_command_customer_id_when_command_customer_id_is_provided")
+    @DisplayName("Should use command customer id when provided in command")
     void should_use_command_customer_id_when_command_customer_id_is_provided() {
         UUID tenantId = UUID.randomUUID();
         UUID contextUserId = UUID.randomUUID();
@@ -111,7 +111,7 @@ class CreateOrderServiceTest {
     }
 
     @Test
-    @DisplayName("should_generate_uuid_v7_for_customer_when_command_customer_id_and_context_user_id_are_null")
+    @DisplayName("Should generate UUIDv7 for customer when command customer id and context user id are null")
     void should_generate_uuid_v7_for_customer_when_command_customer_id_and_context_user_id_are_null() {
         UUID tenantId = UUID.randomUUID();
         UUID generatedCustomerId = UUID.randomUUID();
@@ -139,7 +139,7 @@ class CreateOrderServiceTest {
     }
 
     @Test
-    @DisplayName("should_throw_forbidden_exception_when_context_is_null")
+    @DisplayName("Should throw ForbiddenException when context is null")
     void should_throw_forbidden_exception_when_context_is_null() {
         when(executionContextPort.current()).thenReturn(null);
         CreateOrderCommand command = new CreateOrderCommand(null, new BigDecimal("100.00"), "EUR");
@@ -150,7 +150,7 @@ class CreateOrderServiceTest {
     }
 
     @Test
-    @DisplayName("should_throw_forbidden_exception_when_context_has_no_tenant")
+    @DisplayName("Should throw ForbiddenException when context has no tenant")
     void should_throw_forbidden_exception_when_context_has_no_tenant() {
         when(executionContextPort.current()).thenReturn(ExecutionContext.anonymous());
         CreateOrderCommand command = new CreateOrderCommand(null, new BigDecimal("100.00"), "EUR");
@@ -161,7 +161,7 @@ class CreateOrderServiceTest {
     }
 
     @Test
-    @DisplayName("should_throw_validation_exception_when_currency_code_is_invalid")
+    @DisplayName("Should throw ValidationException when currency code is invalid")
     void should_throw_validation_exception_when_currency_code_is_invalid() {
         UUID tenantId = UUID.randomUUID();
         when(executionContextPort.current()).thenReturn(

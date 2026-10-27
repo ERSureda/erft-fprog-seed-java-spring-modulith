@@ -31,7 +31,7 @@ class OrderJdbcRepositoryTest extends AbstractPostgresIntegrationTest {
     private NamedParameterJdbcTemplate jdbcTemplate;
 
     @Test
-    @DisplayName("should_find_order_result_by_id_when_order_exists")
+    @DisplayName("Should find order result by id when order exists")
     void should_find_order_result_by_id_when_order_exists() {
         UUID orderId = UUID.randomUUID();
         UUID tenantId = UUID.randomUUID();
@@ -59,7 +59,7 @@ class OrderJdbcRepositoryTest extends AbstractPostgresIntegrationTest {
     }
 
     @Test
-    @DisplayName("should_return_empty_when_order_does_not_exist")
+    @DisplayName("Should return empty optional when order does not exist")
     void should_return_empty_when_order_does_not_exist() {
         UUID missingId = UUID.randomUUID();
 

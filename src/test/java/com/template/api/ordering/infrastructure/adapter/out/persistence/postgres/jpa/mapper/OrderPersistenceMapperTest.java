@@ -26,7 +26,7 @@ class OrderPersistenceMapperTest {
     }
 
     @Test
-    @DisplayName("should_map_domain_order_to_entity_when_domain_order_provided")
+    @DisplayName("Should map domain order to entity when domain order provided")
     void should_map_domain_order_to_entity_when_domain_order_provided() {
         UUID orderId = UUID.randomUUID();
         UUID tenantId = UUID.randomUUID();
@@ -47,7 +47,7 @@ class OrderPersistenceMapperTest {
     }
 
     @Test
-    @DisplayName("should_map_entity_to_domain_order_when_entity_provided")
+    @DisplayName("Should map entity to domain order when entity provided")
     void should_map_entity_to_domain_order_when_entity_provided() {
         UUID orderId = UUID.randomUUID();
         UUID tenantId = UUID.randomUUID();
@@ -80,14 +80,14 @@ class OrderPersistenceMapperTest {
     }
 
     @Test
-    @DisplayName("should_return_null_when_source_is_null")
+    @DisplayName("Should return null when source is null")
     void should_return_null_when_source_is_null() {
         assertThat(mapper.toEntity(null)).isNull();
         assertThat(mapper.toDomain(null)).isNull();
     }
 
     @Test
-    @DisplayName("should_return_null_when_entity_is_soft_deleted")
+    @DisplayName("Should return null when entity is soft deleted")
     void should_return_null_when_entity_is_soft_deleted() {
         OrderEntity entity = new OrderEntity(
                 UUID.randomUUID(),

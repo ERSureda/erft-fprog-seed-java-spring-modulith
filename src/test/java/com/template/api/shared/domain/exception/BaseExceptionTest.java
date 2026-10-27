@@ -44,7 +44,7 @@ class BaseExceptionTest {
 
     @Test
     @DisplayName("Should reject null errorCode or null category")
-    void should_reject_null_error_code_or_null_category() {
+    void should_throw_null_pointer_exception_when_error_code_or_category_is_null() {
         assertThatThrownBy(() -> new BaseException(null, ErrorCategory.VALIDATION, "msg") {})
                 .isInstanceOf(NullPointerException.class)
                 .hasMessage("BASE_EXCEPTION_ERROR_CODE_CANNOT_BE_NULL");

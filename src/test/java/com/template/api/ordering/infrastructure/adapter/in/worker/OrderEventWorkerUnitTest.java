@@ -64,7 +64,7 @@ class OrderEventWorkerUnitTest {
     }
 
     @Test
-    @DisplayName("should_skip_processing_when_event_already_processed")
+    @DisplayName("Should skip processing when event is already processed")
     void should_skip_processing_when_event_already_processed() {
         UUID eventId = UUID.randomUUID();
         when(idempotencyGate.tryAcquire("ordering", eventId, "OrderEventWorker")).thenReturn(false);
@@ -76,7 +76,7 @@ class OrderEventWorkerUnitTest {
     }
 
     @Test
-    @DisplayName("should_deserialize_and_execute_use_case_when_event_is_new")
+    @DisplayName("Should deserialize and execute use case when event is new")
     void should_deserialize_and_execute_use_case_when_event_is_new() {
         UUID eventId = UUID.randomUUID();
         UUID orderId = UUID.randomUUID();
@@ -101,7 +101,7 @@ class OrderEventWorkerUnitTest {
     }
 
     @Test
-    @DisplayName("should_release_idempotency_and_throw_when_downstream_fails_with_uncontrolled_exception")
+    @DisplayName("Should release idempotency mark and throw when downstream fails with uncontrolled exception")
     void should_release_idempotency_and_throw_when_downstream_fails_with_uncontrolled_exception() {
         UUID eventId = UUID.randomUUID();
         UUID orderId = UUID.randomUUID();
@@ -125,7 +125,7 @@ class OrderEventWorkerUnitTest {
     }
 
     @Test
-    @DisplayName("should_release_idempotency_and_rethrow_when_downstream_fails_with_transient_technical_exception")
+    @DisplayName("Should release idempotency mark and rethrow when downstream fails with transient technical exception")
     void should_release_idempotency_and_rethrow_when_downstream_fails_with_transient_technical_exception() {
         UUID eventId = UUID.randomUUID();
         UUID orderId = UUID.randomUUID();
@@ -150,7 +150,7 @@ class OrderEventWorkerUnitTest {
     }
 
     @Test
-    @DisplayName("should_not_release_idempotency_and_not_throw_when_downstream_fails_with_conflict_exception")
+    @DisplayName("Should not release idempotency mark and not throw when downstream fails with conflict exception")
     void should_not_release_idempotency_and_not_throw_when_downstream_fails_with_conflict_exception() {
         UUID eventId = UUID.randomUUID();
         UUID orderId = UUID.randomUUID();
@@ -175,7 +175,7 @@ class OrderEventWorkerUnitTest {
     }
 
     @Test
-    @DisplayName("should_not_release_idempotency_and_not_throw_when_downstream_fails_with_validation_exception")
+    @DisplayName("Should not release idempotency mark and not throw when downstream fails with validation exception")
     void should_not_release_idempotency_and_not_throw_when_downstream_fails_with_validation_exception() {
         UUID eventId = UUID.randomUUID();
         UUID orderId = UUID.randomUUID();
@@ -200,7 +200,7 @@ class OrderEventWorkerUnitTest {
     }
 
     @Test
-    @DisplayName("should_propagate_tenant_id_before_idempotency_gate_when_present_in_payload")
+    @DisplayName("Should propagate tenant id before idempotency gate when present in payload")
     void should_propagate_tenant_id_before_idempotency_gate_when_present_in_payload() {
         UUID eventId = UUID.randomUUID();
         UUID orderId = UUID.randomUUID();
@@ -229,7 +229,7 @@ class OrderEventWorkerUnitTest {
     }
 
     @Test
-    @DisplayName("should_propagate_custom_correlation_id_when_present_in_payload")
+    @DisplayName("Should propagate custom correlation id when present in payload")
     void should_propagate_custom_correlation_id_when_present_in_payload() {
         UUID eventId = UUID.randomUUID();
         UUID orderId = UUID.randomUUID();

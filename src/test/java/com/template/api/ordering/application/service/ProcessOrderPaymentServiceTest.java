@@ -5,6 +5,7 @@ import com.template.api.ordering.application.port.out.OrderRepositoryPort;
 import com.template.api.ordering.domain.OrderingError;
 import com.template.api.ordering.domain.model.Order;
 import com.template.api.ordering.domain.model.enums.OrderStatus;
+import com.template.api.ordering.fixture.OrderFixture;
 import com.template.api.shared.application.port.out.UtcClockPort;
 import com.template.api.shared.domain.exception.ResourceNotFoundException;
 import com.template.api.shared.domain.valueobject.Money;
@@ -42,13 +43,13 @@ class ProcessOrderPaymentServiceTest {
     private ProcessOrderPaymentService processOrderPaymentService;
 
     @Test
-    @DisplayName("should_confirm_order_when_payment_status_is_confirmed")
+    @DisplayName("Should confirm order and save when payment status is confirmed")
     void should_confirm_order_when_payment_status_is_confirmed() {
         UUID orderId = UUID.randomUUID();
         UUID tenantId = UUID.randomUUID();
         UUID customerId = UUID.randomUUID();
         Instant fixedNow = Instant.parse("2026-10-25T15:30:00Z");
-        Order order = Order.create(orderId, tenantId, customerId, Money.of(new BigDecimal("120.00"), Currency.getInstance("EUR")));
+        Order order = OrderFixture.createPendingOrder(orderId, tenantId, customerId, Money.of(new BigDecimal("120.00"), Currency.getInstance("EUR")));
         when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
         when(utcClockPort.now()).thenReturn(fixedNow);
 
@@ -60,7 +61,7 @@ class ProcessOrderPaymentServiceTest {
     }
 
     @Test
-    @DisplayName("should_throw_resource_not_found_exception_when_order_not_found")
+    @DisplayName("Should throw ResourceNotFoundException when order is not found")
     void should_throw_resource_not_found_exception_when_order_not_found() {
         UUID orderId = UUID.randomUUID();
         when(orderRepository.findById(orderId)).thenReturn(Optional.empty());

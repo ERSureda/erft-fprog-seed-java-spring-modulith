@@ -308,7 +308,7 @@ class GlobalExceptionHandlerTest {
 
         @Test
         @DisplayName("Should convert 400 Client Error to ErrorResponse with VALIDATION_FAILED")
-        void should_convert_400_problem_detail_to_validation_failed_code() {
+        void should_convert_to_validation_failed_code_when_400_problem_detail_handled() {
             ProblemDetail problem = ProblemDetail.forStatusAndDetail(
                     HttpStatus.BAD_REQUEST,
                     "Malformed JSON request body"
@@ -333,7 +333,7 @@ class GlobalExceptionHandlerTest {
 
         @Test
         @DisplayName("Should convert 401 Client Error to ErrorResponse with UNAUTHENTICATED")
-        void should_convert_401_problem_detail_to_unauthenticated_code() {
+        void should_convert_to_unauthenticated_code_when_401_problem_detail_handled() {
             ProblemDetail problem = ProblemDetail.forStatusAndDetail(
                     HttpStatus.UNAUTHORIZED,
                     "Authentication credentials required"
@@ -358,7 +358,7 @@ class GlobalExceptionHandlerTest {
 
         @Test
         @DisplayName("Should convert 403 Client Error to ErrorResponse with FORBIDDEN")
-        void should_convert_403_problem_detail_to_forbidden_code() {
+        void should_convert_to_forbidden_code_when_403_problem_detail_handled() {
             ProblemDetail problem = ProblemDetail.forStatusAndDetail(
                     HttpStatus.FORBIDDEN,
                     "Access denied to resource"
@@ -383,7 +383,7 @@ class GlobalExceptionHandlerTest {
 
         @Test
         @DisplayName("Should convert 500 Server Error to ErrorResponse with INTERNAL_SERVER_ERROR")
-        void should_convert_500_problem_detail_to_internal_server_error_code() {
+        void should_convert_to_internal_server_error_code_when_500_problem_detail_handled() {
             ProblemDetail problem = ProblemDetail.forStatusAndDetail(
                     HttpStatus.INTERNAL_SERVER_ERROR,
                     "An unexpected error occurred"

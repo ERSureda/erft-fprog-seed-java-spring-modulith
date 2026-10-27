@@ -25,7 +25,7 @@ class OrderResultRowMapperTest {
     private final OrderResultRowMapper mapper = new OrderResultRowMapper();
 
     @Test
-    @DisplayName("should_map_result_set_row_to_order_result_when_row_is_valid")
+    @DisplayName("Should map result set row to order result when row is valid")
     void should_map_result_set_row_to_order_result_when_row_is_valid() throws SQLException {
         UUID orderId = UUID.randomUUID();
         when(resultSet.getObject("id", UUID.class)).thenReturn(orderId);

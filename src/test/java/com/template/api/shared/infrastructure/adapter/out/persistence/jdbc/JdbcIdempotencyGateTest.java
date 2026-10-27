@@ -199,7 +199,7 @@ class JdbcIdempotencyGateTest {
     }
 
     @Test
-    @DisplayName("should_throw_validation_exception_when_schema_name_is_invalid")
+    @DisplayName("Should throw validation exception when schema name is invalid")
     void should_throw_validation_exception_when_schema_name_is_invalid() {
         UUID eventId = UUID.randomUUID();
 
@@ -209,8 +209,8 @@ class JdbcIdempotencyGateTest {
     }
 
     @Test
-    @DisplayName("should_wrap_jdbc_exceptions_in_infrastructure_exception_preserving_cause")
-    void should_wrap_jdbc_exceptions_in_infrastructure_exception_preserving_cause() {
+    @DisplayName("Should wrap in infrastructure exception when JDBC exception occurs")
+    void should_wrap_in_infrastructure_exception_when_jdbc_exception_occurs() {
         UUID eventId = UUID.randomUUID();
         DataAccessResourceFailureException dbError = new DataAccessResourceFailureException("DB connection lost");
         when(jdbcTemplate.update(contains("INSERT INTO shared.processed_events"), anyMap())).thenThrow(dbError);

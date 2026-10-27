@@ -110,7 +110,7 @@ class OutboxRelayServiceTest {
 
     @Test
     @DisplayName("Should claim multiple events in a single batch and settle delivered IDs in batch")
-    void should_claim_multiple_events_in_batch_and_settle_each_individually() throws Exception {
+    void should_claim_multiple_events_and_settle_each_when_batch_processed() throws Exception {
         UUID eventId1 = UUID.randomUUID();
         UUID eventId2 = UUID.randomUUID();
 
@@ -206,7 +206,7 @@ class OutboxRelayServiceTest {
 
     @Test
     @DisplayName("Should isolate event settlements so failure of one event does not affect another")
-    void should_handle_partial_batch_failure_without_affecting_other_events() throws Exception {
+    void should_handle_partial_batch_failure_without_affecting_other_events_when_one_event_fails() throws Exception {
         UUID eventId1 = UUID.randomUUID();
         UUID eventId2 = UUID.randomUUID();
 
@@ -281,7 +281,7 @@ class OutboxRelayServiceTest {
 
     @Test
     @DisplayName("Should handle database failure during claim phase gracefully without throwing")
-    void should_handle_database_failure_during_claim_phase_gracefully() {
+    void should_handle_failure_gracefully_when_database_fails_during_claim_phase() {
         when(jdbcTemplate.queryForList(anyString(), anyMap()))
                 .thenThrow(new DataAccessResourceFailureException("Database unreachable"));
 

@@ -160,7 +160,7 @@ class ExecutionContextFilterTest {
 
     @Test
     @DisplayName("Should parse multiple roles with spaces and empty tokens safely")
-    void should_parse_multiple_roles_with_spaces_and_empty_tokens() throws ServletException, IOException {
+    void should_parse_multiple_roles_when_spaces_and_empty_tokens_present() throws ServletException, IOException {
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.addHeader(ApiHeaders.ROLES, "ROLE_ADMIN, , ROLE_USER , , ROLE_MANAGER");
         MockHttpServletResponse response = new MockHttpServletResponse();

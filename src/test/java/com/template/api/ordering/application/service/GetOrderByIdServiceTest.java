@@ -38,7 +38,7 @@ class GetOrderByIdServiceTest {
     private GetOrderByIdService getOrderByIdService;
 
     @Test
-    @DisplayName("should_return_order_result_when_order_exists")
+    @DisplayName("Should return order result when order exists")
     void should_return_order_result_when_order_exists() {
         UUID orderId = UUID.randomUUID();
         UUID tenantId = UUID.randomUUID();
@@ -55,7 +55,7 @@ class GetOrderByIdServiceTest {
     }
 
     @Test
-    @DisplayName("should_throw_resource_not_found_exception_when_order_not_found")
+    @DisplayName("Should throw ResourceNotFoundException when order is not found")
     void should_throw_resource_not_found_exception_when_order_not_found() {
         UUID orderId = UUID.randomUUID();
         UUID tenantId = UUID.randomUUID();
@@ -70,7 +70,7 @@ class GetOrderByIdServiceTest {
     }
 
     @Test
-    @DisplayName("should_throw_forbidden_exception_when_tenant_context_is_missing")
+    @DisplayName("Should throw ForbiddenException when tenant context is missing")
     void should_throw_forbidden_exception_when_tenant_context_is_missing() {
         UUID orderId = UUID.randomUUID();
         when(executionContextPort.current()).thenReturn(ExecutionContext.anonymous());

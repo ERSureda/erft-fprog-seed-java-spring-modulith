@@ -195,7 +195,7 @@ class MoneyTest {
 
         @Test
         @DisplayName("Should handle equals boundary cases and compute arithmetic hashCode")
-        void should_handle_equals_boundary_cases_and_compute_arithmetic_hash_code() {
+        void should_handle_equals_boundary_cases_and_compute_arithmetic_hash_code_when_comparing_instances() {
             Money m1 = Money.of(new BigDecimal("10.00"), EUR);
             Money m2 = Money.of(new BigDecimal("10"), EUR);
             Money m3 = Money.of(new BigDecimal("20.00"), EUR);

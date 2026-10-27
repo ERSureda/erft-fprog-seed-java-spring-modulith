@@ -9,7 +9,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class OrderJdbcQueriesTest {
 
     @Test
-    @DisplayName("should_define_valid_query_when_selecting_order_by_id")
+    @DisplayName("Should define valid SQL query when selecting order by id")
     void should_define_valid_query_when_selecting_order_by_id() {
         String query = OrderJdbcQueries.SELECT_ORDER_BY_ID;
 

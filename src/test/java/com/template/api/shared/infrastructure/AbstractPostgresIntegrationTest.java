@@ -1,6 +1,6 @@
 package com.template.api.shared.infrastructure;
 
-import org.junit.jupiter.api.Assertions;
+import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.slf4j.Logger;

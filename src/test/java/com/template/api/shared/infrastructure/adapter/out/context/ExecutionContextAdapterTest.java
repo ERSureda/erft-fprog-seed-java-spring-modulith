@@ -29,7 +29,7 @@ class ExecutionContextAdapterTest {
     }
 
     @Test
-    @DisplayName("should_return_anonymous_context_when_holder_is_empty")
+    @DisplayName("Should return anonymous context when holder is empty")
     void should_return_anonymous_context_when_holder_is_empty() {
         ExecutionContext current = adapter.current();
 
@@ -39,7 +39,7 @@ class ExecutionContextAdapterTest {
     }
 
     @Test
-    @DisplayName("should_return_bound_context_when_holder_is_populated")
+    @DisplayName("Should return bound context when holder is populated")
     void should_return_bound_context_when_holder_is_populated() {
         ExecutionContext expected = new ExecutionContext(UUID.randomUUID(), UUID.randomUUID(), Set.of("USER"), "corr-1");
         ExecutionContextHolder.set(expected);

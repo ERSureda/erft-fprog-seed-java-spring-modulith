@@ -78,7 +78,7 @@ class TenantRlsConnectionCustomizerTest {
 
     @Test
     @DisplayName("Should execute set_config only once for nested transactional calls within same transaction")
-    void should_execute_set_config_only_once_for_nested_calls_within_same_transaction() throws Throwable {
+    void should_execute_set_config_only_once_when_nested_calls_within_same_transaction() throws Throwable {
         TransactionSynchronizationManager.initSynchronization();
 
         UUID tenantId = UUID.randomUUID();
@@ -98,7 +98,7 @@ class TenantRlsConnectionCustomizerTest {
 
     @Test
     @DisplayName("Should unbind synchronization resource after transaction completion")
-    void should_unbind_synchronization_resource_after_transaction_completion() throws Throwable {
+    void should_unbind_synchronization_resource_when_transaction_completes() throws Throwable {
         TransactionSynchronizationManager.initSynchronization();
 
         UUID tenantId = UUID.randomUUID();

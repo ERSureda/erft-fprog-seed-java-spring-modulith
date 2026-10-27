@@ -41,7 +41,7 @@ class OrderEventWorkerTest extends AbstractPostgresIntegrationTest {
     }
 
     @Test
-    @DisplayName("should_deduplicate_event_when_received_twice_with_same_event_id")
+    @DisplayName("Should deduplicate event when received twice with same event id")
     void should_deduplicate_event_when_received_twice_with_same_event_id() {
         UUID eventId = UUID.randomUUID();
         String payloadJson = """
