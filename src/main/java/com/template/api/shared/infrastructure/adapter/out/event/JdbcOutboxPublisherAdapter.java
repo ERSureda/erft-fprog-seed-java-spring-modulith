@@ -84,10 +84,7 @@ public class JdbcOutboxPublisherAdapter implements OutboxPublisherPort {
     }
 
     private String resolveTable(String moduleSchema) {
-        if (moduleSchema == null || moduleSchema.isBlank() || "default".equalsIgnoreCase(moduleSchema.trim())) {
-            return "outbox_events";
-        }
-        return moduleSchema.trim() + ".outbox_events";
+        return "shared.outbox_events";
     }
 
     private String resolveAggregateType(DomainEvent event) {

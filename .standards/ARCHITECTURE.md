@@ -143,8 +143,8 @@ Dado que los desarrolladores y subagentes operan bajo **Poda Quirúrgica de Cont
 | `application.port.out` | `interface UuidGeneratorPort` | `UUID generateId()` *(genera UUIDv7 secuencial conforme a RFC 9562 con CAS lock-free)* | `UUID orderId = uuidGenerator.generateId();` |
 | `application.port.out` | `interface UtcClockPort` | `Instant now()`, `LocalDate todayUtc()` | Control temporal determinista y testeable. |
 | `application.port.out` | `interface ExecutionContextPort` | `ExecutionContext current()` | Acceso seguro al contexto de sesión actual. |
-| `application.port.out` | `interface OutboxPublisherPort` | `void publish(DomainEvent event)`<br>`void publishAll(List<DomainEvent> events)`<br>`void publish(String moduleSchema, String aggregateType, UUID aggregateId, DomainEvent event)` | Guarda los eventos en `<moduleSchema>.outbox_events`. |
-| `application.port.out` | `interface IdempotencyGate` | `boolean tryAcquire(String moduleSchema, UUID eventId, String consumerName)`<br>`void release(String moduleSchema, UUID eventId, String consumerName)` | Deduplica eventos en `<moduleSchema>.processed_events`. |
+| `application.port.out` | `interface OutboxPublisherPort` | `void publish(DomainEvent event)`<br>`void publishAll(List<DomainEvent> events)`<br>`void publish(String moduleSchema, String aggregateType, UUID aggregateId, DomainEvent event)` | Guarda los eventos en `shared.outbox_events` (en fase de monolito modular con Spring Modulith; evolucionable a `<moduleSchema>.outbox_events` al desacoplar a microservicio). |
+| `application.port.out` | `interface IdempotencyGate` | `boolean tryAcquire(String moduleSchema, UUID eventId, String consumerName)`<br>`void release(String moduleSchema, UUID eventId, String consumerName)` | Deduplica eventos en `shared.processed_events` (monolito modular) o `<moduleSchema>.processed_events` (microservicio). |
 | `infrastructure.adapter.in.web` | `final class ApiHeaders` | `TENANT_ID = "X-Tenant-Id"`, `USER_ID = "X-User-Id"`, `ROLES = "X-Roles"`, `CORRELATION_ID = "X-Correlation-Id"` | Cabeceras HTTP estándar del ecosistema. |
 
 ---
@@ -183,7 +183,7 @@ Obliga a hidratar el Agregado de Dominio para validar invariantes y ejecutar ló
 1. **`[Adapter IN (Controller)]`**: Valida sintaxis de la petición (`@Valid` en DTO `*HttpRequest` con tokens `[ENTIDAD]_[CAMPO]_[REGLA]`). Mapea payload a Command inmutable vía factoría directa en record: `request.toCommand(...)`.
 2. **`[Application (Service)]`**: Abre delimitación transaccional (`@Transactional`) y enlaza `app.current_tenant_id` (RLS). Verifica contexto (`requireTenantId`), resuelve `UuidGeneratorPort` / `UtcClockPort` si aplica, e hidrata o crea el Agregado invocando puerto de salida.
 3. **`[Domain (AggregateRoot)]`**: Ejecuta método de negocio semántico guiado por predicados FSM (`canConfirm()`, etc.). Valida invariantes (*fail-fast* `Objects.requireNonNull` / `BaseException`) y registra `DomainEvent`.
-4. **`[Adapter OUT (Persistence)]`**: Persiste el nuevo estado del Agregado en `<module_id>.<tabla>` con versión optimista vía JPA. Extrae `pullDomainEvents()` y publica vía `OutboxPublisherPort` en `<module_id>.outbox_events` (`UUIDv7`).
+4. **`[Adapter OUT (Persistence)]`**: Persiste el nuevo estado del Agregado en `<module_id>.<tabla>` con versión optimista vía JPA. Extrae `pullDomainEvents()` y publica vía `OutboxPublisherPort` en `shared.outbox_events` (`UUIDv7`).
 5. **`[Application (Service)]`**: Cierra transacción. Retorna DTO de salida (`*Result`) o lanza excepción tipada de coste cero (`BaseException` con `<Subdominio>Error`).
 6. **`[Adapter IN (Controller)]`**: Devuelve DTO directamente con `@ResponseStatus(HttpStatus.CREATED / OK)` para códigos fijos. Si hay fallo, `GlobalExceptionHandler` mapea a `ErrorResponse` estándar.
 
@@ -197,7 +197,7 @@ Optimiza memoria y rendimiento proyectando directamente desde la base de datos a
 ### 4.3. Camino de Consumo Asíncrono / Background (Worker & Event Flow)
 Gobierna la recepción desacoplada de eventos inter-módulo (`EVT-xx` en `04-INTEGRATION.md` y `CMD-xx` con canal `ASYNC_WORKER` en `API.md`):
 1. **`[Adapter IN (Worker)]`**: Recibe payload del evento (`eventId`, `tenantId`, `correlationId`, `payload` JSONB) y deserializa a record (`*EventMessage`). Inicializa `ExecutionContext` propagando `tenantId` y `correlationId` (`ExecutionContextHolder.runWith(...)`, compatibilidad RLS `INP-04`).
-2. **`[Idempotency Gate]`**: Invoca `idempotencyGate.tryAcquire(moduleSchema, eventId, consumerName)`. Si YA fue procesado (existe en `<module_id>.processed_events`), cortocircuita, emite ACK y termina. Si NO fue procesado, continúa ejecución.
+2. **`[Idempotency Gate]`**: Invoca `idempotencyGate.tryAcquire(moduleSchema, eventId, consumerName)`. Si YA fue procesado (existe en `shared.processed_events`), cortocircuita, emite ACK y termina. Si NO fue procesado, continúa ejecución.
 3. **`[Application (Service)]`**: Mapea a Command `MULTICHANNEL` (`message.toCommand()`) con validación *fail-fast* `Objects.requireNonNull`. Invoca el `UseCase` correspondiente bajo transacción local (`@Transactional`).
 4. **`[Domain / Persistencia]`**: Procesa lógica de negocio y registra mutaciones en el esquema `<module_id>`.
 5. **`[Adapter IN (Worker) — Manejo Diferenciado de Fallos (EXCEPTIONS.md Sección 6.2)]`**:
@@ -338,7 +338,7 @@ Gobierna la recepción desacoplada de eventos inter-módulo (`EVT-xx` en `04-INT
 * **`OUT-05 · MUST` [A] — Transactional Outbox Desacoplado**
     * **Regla:** El Transactional Outbox se desacopla de las entidades mediante el puerto transversal `OutboxPublisherPort` en `shared/application/port/out/` y su adaptador `JdbcOutboxPublisherAdapter`.
     * **Motivación:** Garantiza consistencia eventual sin doble escritura (*dual-write*). Si la base de datos confirma, el evento existe con certeza.
-    * **Guardarraíl Técnico:** Persistencia atómica de `aggregate.pullDomainEvents()` en `<module_id>.outbox_events` con identificadores UUIDv7 ordenados temporalmente.
+    * **Guardarraíl Técnico:** Persistencia atómica de `aggregate.pullDomainEvents()` en `shared.outbox_events` (en fase de monolito modular con Spring Modulith; evolucionable a `<module_id>.outbox_events` al desacoplar a microservicio) con identificadores UUIDv7 ordenados temporalmente.
     * **Guardián CI (`PersistenceRulesArchTest` + Testcontainers):** Falla si clases que utilizan `NamedParameterJdbcTemplate` residen fuera de `..persistence..jdbc..` o de adaptadores transversales en `..shared.infrastructure.adapter.out..`.
 * **`OUT-06 · MUST` [A] — Migraciones Flyway y Cero Claves Foráneas Cruzadas**
     * **Regla:** Cada Bounded Context posee su propio esquema relacional en PostgreSQL (`CREATE SCHEMA IF NOT EXISTS <module_id>`) y gestiona sus tablas exclusivamente mediante scripts Flyway `V<N>__init_<module_id>_tables.sql`. Queda terminantemente prohibido definir claves foráneas físicas (`FOREIGN KEY`) entre esquemas de módulos distintos.
@@ -351,9 +351,9 @@ Gobierna la recepción desacoplada de eventos inter-módulo (`EVT-xx` en `04-INT
     * **Guardarraíl Técnico:** Orden canónico de columnas (`1. version, created_at, updated_at, deleted_at` -> `2. status, flags` -> `3. id, tenant_id, FKs` -> `4. datos de negocio con dominios shared.*`); constraints prefijadas (`pk_`, `fk_`, `uq_`, `chk_`) con checks canónicos (`chk_<tabla>_version_non_neg`, `chk_<tabla>_updated_coherence`, `chk_<tabla>_deleted_coherence`); parámetros `WITH (fillfactor = 90)` en tablas de negocio; y políticas `ENABLE ROW LEVEL SECURITY` y `FORCE ROW LEVEL SECURITY` con `USING (tenant_id = (SELECT NULLIF(current_setting('app.current_tenant_id', true), '')::uuid))`.
     * **Guardián CI:** Test Mandatorio de Fuga entre Inquilinos (`TST-08` en `TESTING.md`).
 * **`OUT-08 · MUST` [A] — Bitácora Forense Inmutable Particionada**
-    * **Regla:** Cada módulo aprovisionará en su esquema una bitácora forense `<module_id>.audit_log` particionada mensualmente por rangos temporales (`PARTITION BY RANGE (occurred_at)`).
-    * **Motivación:** Exigencia regulatoria y forense en sistemas transaccionales B2B que asegura trazabilidad inmutable sin degradar el rendimiento de la tabla principal.
-    * **Guardarraíl Técnico:** Revocación de permisos destructivos tanto con `REVOKE UPDATE, DELETE, TRUNCATE ON <module_id>.audit_log FROM PUBLIC;` como mediante el bloque idempotente `DO $$ BEGIN IF EXISTS (SELECT FROM pg_roles WHERE rolname = '<app_role>') THEN REVOKE UPDATE, DELETE, TRUNCATE ON <module_id>.audit_log FROM <app_role>; END IF; END $$;` para compatibilidad con Testcontainers.
+    * **Regla:** En arquitectura de monolito modular (Spring Modulith), la bitácora forense reside centralizada en `shared.audit_log` (inicializada en `V1__init_shared_infrastructure.sql`), particionada mensualmente por rangos temporales (`PARTITION BY RANGE (occurred_at)`). Cada módulo de negocio registra sus eventos en esta tabla compartida sin duplicar tablas de auditoría por módulo. Al desacoplar un módulo como microservicio independiente con base de datos autónoma, este aprovisionará su propio `<module_id>.audit_log`.
+    * **Motivación:** Exigencia regulatoria y forense en sistemas transaccionales B2B que asegura trazabilidad inmutable sin degradar el rendimiento de la tabla principal ni multiplicar tablas de infraestructura técnica innecesariamente en el monolito.
+    * **Guardarraíl Técnico:** Revocación de permisos destructivos tanto con `REVOKE UPDATE, DELETE, TRUNCATE ON shared.audit_log FROM PUBLIC;` como mediante el bloque idempotente `DO $$ BEGIN IF EXISTS (SELECT FROM pg_roles WHERE rolname = '<app_role>') THEN REVOKE UPDATE, DELETE, TRUNCATE ON shared.audit_log FROM <app_role>; END IF; END $$;` para compatibilidad con Testcontainers.
     * **Guardián CI:** Verificación Flyway en Testcontainers.
 
 ### 5.6. Transacciones, Consistencia y Outbox (`TRX`)
@@ -369,7 +369,7 @@ Gobierna la recepción desacoplada de eventos inter-módulo (`EVT-xx` en `04-INT
     * **Guardarraíl Técnico:** Mapeo a columna `version` y control mediante JPA/Hibernate.
     * **Guardián CI:** Pruebas de integración de persistencia con concurrencia simulada.
 * **`TRX-03 · MUST` [A] — Transactional Outbox con UUIDv7**
-    * **Regla:** Todo evento de dominio con visibilidad `PUBLISHED_TO_OUTBOX` se persistirá en la tabla `<module_id>.outbox_events` dentro de la misma transacción local de base de datos.
+    * **Regla:** Todo evento de dominio con visibilidad `PUBLISHED_TO_OUTBOX` se persistirá en la tabla `shared.outbox_events` (en fase de monolito modular con Spring Modulith; `<module_id>.outbox_events` tras desacoplamiento a microservicio) dentro de la misma transacción local de base de datos.
     * **Motivación:** Los identificadores UUIDv7 están ordenados en el tiempo, lo que previene la fragmentación de índices B-Tree en inserciones masivas de alta velocidad.
     * **Guardarraíl Técnico:** Asignación de `id UUID` versión 7 generado en infraestructura.
     * **Guardián CI:** Test de persistencia de eventos Outbox.
@@ -460,10 +460,10 @@ Antes de aprobar la integración de código a ramas principales o cerrar el `Gat
 - [ ] **Factoría Directa y `@ResponseStatus` en Web (`INP-01`, `INP-05`):** ¿Las peticiones web residen en `dto/` con sufijo `HttpRequest`, mapean a Comando mediante `toCommand()` y los controladores retornan el DTO con `@ResponseStatus`?
 - [ ] **Confinamiento de Entidades JPA (`OUT-01`, `OUT-02`):** ¿Las entidades `@Entity` están estrictamente confinadas al adaptador de persistencia JPA (`postgres/jpa/`)?
 - [ ] **Proyecciones CQRS en JDBC (`OUT-04`):** ¿Las consultas de lectura (`QRY-xx`) van directas a proyecciones DTO vía JDBC (`postgres/jdbc/`) respaldadas por índices de `schema.sql` sin hidratar Agregados?
-- [ ] **Transactional Outbox (`DOM-05`, `OUT-05`, `TRX-03`):** ¿Toda mutación de negocio registra su `DomainEvent` y lo persiste atómicamente en `<module_id>.outbox_events` vía `OutboxPublisherPort`?
-- [ ] **Idempotencia y Liberación Defensiva (`TRX-05`):** ¿Todo consumidor de eventos (`*Worker`) verifica `<module_id>.processed_events` vía `IdempotencyGate` y libera defensivamente la marca (`release`) solo ante fallos técnicos transitorios?
+- [ ] **Transactional Outbox (`DOM-05`, `OUT-05`, `TRX-03`):** ¿Toda mutación de negocio registra su `DomainEvent` y lo persiste atómicamente en `shared.outbox_events` (monolito) vía `OutboxPublisherPort`?
+- [ ] **Idempotencia y Liberación Defensiva (`TRX-05`):** ¿Todo consumidor de eventos (`*Worker`) verifica `shared.processed_events` (monolito) vía `IdempotencyGate` y libera defensivamente la marca (`release`) solo ante fallos técnicos transitorios?
 - [ ] **Serialización Estándar y Gramática de Errores (`INP-03`, `SHR-04`, `ERR-01`, `ERR-03`):** ¿Los errores implementan `ErrorCode` en biyección 1:1 entre `DOMAIN.md` y `API.md` (`[MODULO]_[ENTIDAD]_[MOTIVO]`), heredan de `BaseException` y se serializan vía `GlobalExceptionHandler` a `ErrorResponse`?
-- [ ] **Migraciones Flyway, RLS y Auditoría (`OUT-06`..`OUT-08`):** ¿La migración Flyway `V<N>__init_<module_id>_tables.sql` traslada fielmente `docs/modules/<module_id>/schema.sql` con schema propio, 0 FKs cruzadas, `fillfactor = 90`, constraints prefijadas (`pk_`, `fk_`, `uq_`, `chk_`), `audit_log` particionado y `FORCE ROW LEVEL SECURITY`?
+- [ ] **Migraciones Flyway, RLS y Auditoría (`OUT-06`..`OUT-08`):** ¿La migración Flyway `V<N>__init_<module_id>_tables.sql` traslada fielmente `docs/modules/<module_id>/schema.sql` con schema propio, 0 FKs cruzadas, `fillfactor = 90`, constraints prefijadas (`pk_`, `fk_`, `uq_`, `chk_`), usando la bitácora centralizada `shared.audit_log` y `FORCE ROW LEVEL SECURITY`?
 
 ### 7.2. Índice de Decisiones de Arquitectura Corporativas (ADRs)
 

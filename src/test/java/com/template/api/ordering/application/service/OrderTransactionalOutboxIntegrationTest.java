@@ -65,7 +65,7 @@ class OrderTransactionalOutboxIntegrationTest extends AbstractPostgresIntegratio
                     Integer.class
             );
             Integer outboxCount = jdbcTemplate.queryForObject(
-                    "SELECT count(*) FROM ordering.outbox_events WHERE payload::text LIKE :match",
+                    "SELECT count(*) FROM shared.outbox_events WHERE payload::text LIKE :match",
                     Map.of("match", "%" + customerId + "%"),
                     Integer.class
             );

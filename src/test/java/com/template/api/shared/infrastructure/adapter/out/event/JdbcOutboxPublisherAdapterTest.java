@@ -85,7 +85,7 @@ class JdbcOutboxPublisherAdapterTest {
         adapter.publish("ordering", "Order", aggId, event);
 
         ArgumentCaptor<MapSqlParameterSource> captor = ArgumentCaptor.forClass(MapSqlParameterSource.class);
-        verify(jdbcTemplate, times(1)).update(contains("INSERT INTO ordering.outbox_events"), captor.capture());
+        verify(jdbcTemplate, times(1)).update(contains("INSERT INTO shared.outbox_events"), captor.capture());
 
         MapSqlParameterSource params = captor.getValue();
         assertThat(params.getValue("eventId")).isEqualTo(eventId);

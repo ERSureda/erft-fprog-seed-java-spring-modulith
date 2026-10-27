@@ -10,6 +10,8 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -39,7 +41,8 @@ public class OrderEntity {
     @Column(name = "currency", nullable = false, length = 3)
     private String currency;
 
-    @Column(name = "status", nullable = false, length = 32)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
+    @Column(name = "status", nullable = false)
     private String status;
 
     @Version

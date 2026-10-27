@@ -65,9 +65,6 @@ public class JdbcIdempotencyGate implements IdempotencyGate {
     }
 
     private String resolveTable(String moduleSchema) {
-        if (moduleSchema == null || moduleSchema.isBlank() || "default".equalsIgnoreCase(moduleSchema.trim())) {
-            return "processed_events";
-        }
-        return moduleSchema.trim() + ".processed_events";
+        return "shared.processed_events";
     }
 }

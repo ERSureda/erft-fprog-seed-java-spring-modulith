@@ -36,7 +36,7 @@ class OrderEventWorkerTest extends AbstractPostgresIntegrationTest {
     @BeforeEach
     void setUp() {
         if (jdbcTemplate != null) {
-            jdbcTemplate.getJdbcTemplate().execute("TRUNCATE TABLE ordering.processed_events");
+            jdbcTemplate.getJdbcTemplate().execute("TRUNCATE TABLE shared.processed_events");
         }
     }
 
@@ -55,7 +55,7 @@ class OrderEventWorkerTest extends AbstractPostgresIntegrationTest {
 
         await().atMost(Duration.ofSeconds(5)).untilAsserted(() -> {
             Integer count = jdbcTemplate.queryForObject(
-                    "SELECT COUNT(*) FROM ordering.processed_events WHERE event_id = :id",
+                    "SELECT COUNT(*) FROM shared.processed_events WHERE event_id = :id",
                     Map.of("id", eventId),
                     Integer.class
             );

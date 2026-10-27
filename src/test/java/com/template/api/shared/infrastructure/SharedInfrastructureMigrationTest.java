@@ -21,15 +21,30 @@ class SharedInfrastructureMigrationTest extends AbstractPostgresIntegrationTest 
         assertThat(jdbcTemplate).isNotNull();
 
         Integer outboxCount = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'outbox_events'",
+                "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'shared' AND table_name = 'outbox_events'",
                 Integer.class
         );
         Integer processedCount = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'processed_events'",
+                "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'shared' AND table_name = 'processed_events'",
+                Integer.class
+        );
+        Integer auditCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'shared' AND table_name = 'audit_log'",
+                Integer.class
+        );
+        Integer partitionTablesCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'shared' AND table_name = 'partitioned_tables'",
+                Integer.class
+        );
+        Integer healthViewCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM information_schema.views WHERE table_schema = 'shared' AND table_name = 'v_default_partitions_health'",
                 Integer.class
         );
 
         assertThat(outboxCount).isEqualTo(1);
         assertThat(processedCount).isEqualTo(1);
+        assertThat(auditCount).isEqualTo(1);
+        assertThat(partitionTablesCount).isEqualTo(1);
+        assertThat(healthViewCount).isEqualTo(1);
     }
 }

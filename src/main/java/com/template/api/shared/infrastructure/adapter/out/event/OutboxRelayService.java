@@ -37,7 +37,7 @@ public class OutboxRelayService {
             EventPublisherPort eventPublisherPort,
             ObjectMapper objectMapper,
             @Autowired(required = false) TransactionOperations transactionOperations,
-            @Value("${outbox.schemas:public,ordering}") List<String> schemas
+            @Value("${outbox.schemas:shared}") List<String> schemas
     ) {
         this.jdbcTemplate = jdbcTemplate;
         this.eventPublisherPort = eventPublisherPort;

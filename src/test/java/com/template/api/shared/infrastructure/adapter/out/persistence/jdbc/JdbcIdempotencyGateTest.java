@@ -36,7 +36,7 @@ class JdbcIdempotencyGateTest {
     @DisplayName("tryAcquire should return true when insert succeeds with default schema")
     void should_return_true_when_try_acquire_succeeds_with_default_schema() {
         UUID eventId = UUID.randomUUID();
-        when(jdbcTemplate.update(contains("INSERT INTO processed_events"), anyMap())).thenReturn(1);
+        when(jdbcTemplate.update(contains("INSERT INTO shared.processed_events"), anyMap())).thenReturn(1);
 
         boolean acquired = idempotencyGate.tryAcquire(eventId, "TestConsumer");
 
@@ -47,7 +47,7 @@ class JdbcIdempotencyGateTest {
     @DisplayName("tryAcquire should return false on conflict duplicate")
     void should_return_false_when_try_acquire_detects_conflict() {
         UUID eventId = UUID.randomUUID();
-        when(jdbcTemplate.update(contains("INSERT INTO processed_events"), anyMap())).thenReturn(0);
+        when(jdbcTemplate.update(contains("INSERT INTO shared.processed_events"), anyMap())).thenReturn(0);
 
         boolean acquired = idempotencyGate.tryAcquire(eventId, "TestConsumer");
 
@@ -58,7 +58,7 @@ class JdbcIdempotencyGateTest {
     @DisplayName("tryAcquire with schema parameter should insert and return true when successful")
     void should_return_true_when_try_acquire_with_module_schema_succeeds() {
         UUID eventId = UUID.randomUUID();
-        when(jdbcTemplate.update(contains("INSERT INTO ordering.processed_events"), eq(Map.of(
+        when(jdbcTemplate.update(contains("INSERT INTO shared.processed_events"), eq(Map.of(
                 "eventId", eventId,
                 "consumerName", "OrderingWorker"
         )))).thenReturn(1);
@@ -72,12 +72,12 @@ class JdbcIdempotencyGateTest {
     @DisplayName("release should execute delete and return true when row removed")
     void should_return_true_when_release_deletes_row() {
         UUID eventId = UUID.randomUUID();
-        when(jdbcTemplate.update(contains("DELETE FROM processed_events"), anyMap())).thenReturn(1);
+        when(jdbcTemplate.update(contains("DELETE FROM shared.processed_events"), anyMap())).thenReturn(1);
 
         boolean released = idempotencyGate.release(eventId);
 
         assertThat(released).isTrue();
-        verify(jdbcTemplate).update(contains("DELETE FROM processed_events"), eq(Map.of("eventId", eventId)));
+        verify(jdbcTemplate).update(contains("DELETE FROM shared.processed_events"), eq(Map.of("eventId", eventId)));
     }
 
     @Test
@@ -88,7 +88,7 @@ class JdbcIdempotencyGateTest {
         idempotencyGate.release("ordering", eventId, "OrderingWorker");
 
         verify(jdbcTemplate).update(
-                contains("ordering.processed_events WHERE event_id = :eventId AND consumer_name = :consumerName"),
+                contains("shared.processed_events WHERE event_id = :eventId AND consumer_name = :consumerName"),
                 eq(Map.of("eventId", eventId, "consumerName", "OrderingWorker"))
         );
     }
@@ -97,7 +97,7 @@ class JdbcIdempotencyGateTest {
     @DisplayName("isProcessed should return true when count is positive")
     void should_return_true_when_is_processed_count_is_positive() {
         UUID eventId = UUID.randomUUID();
-        when(jdbcTemplate.queryForObject(contains("SELECT COUNT(*) FROM processed_events"), anyMap(), eq(Integer.class))).thenReturn(1);
+        when(jdbcTemplate.queryForObject(contains("SELECT COUNT(*) FROM shared.processed_events"), anyMap(), eq(Integer.class))).thenReturn(1);
 
         boolean processed = idempotencyGate.isProcessed(eventId);
 
@@ -108,7 +108,7 @@ class JdbcIdempotencyGateTest {
     @DisplayName("isProcessed with schema should return true when count is positive")
     void should_return_true_when_is_processed_with_schema_count_is_positive() {
         UUID eventId = UUID.randomUUID();
-        when(jdbcTemplate.queryForObject(contains("SELECT COUNT(*) FROM ordering.processed_events"), eq(Map.of("eventId", eventId)), eq(Integer.class))).thenReturn(1);
+        when(jdbcTemplate.queryForObject(contains("SELECT COUNT(*) FROM shared.processed_events"), eq(Map.of("eventId", eventId)), eq(Integer.class))).thenReturn(1);
 
         boolean processed = idempotencyGate.isProcessed("ordering", eventId);
 

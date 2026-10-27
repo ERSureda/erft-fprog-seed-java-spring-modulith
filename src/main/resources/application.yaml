@@ -35,6 +35,9 @@ management:
       show-details: when_authorized
 
 outbox:
-  schemas: public,ordering
+  schemas: shared
   poll-interval-ms: 1000
   purge-cron: "0 0 3 * * ?"
+
+partition:
+  maintenance-cron: "0 0 2 1 * ?"

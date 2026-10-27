@@ -6,7 +6,6 @@
 -- -----------------------------------------------------------------------------
 -- 1. EXTENSIONES DEL MOTOR
 -- -----------------------------------------------------------------------------
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "btree_gist";
 CREATE EXTENSION IF NOT EXISTS "pg_trgm";
 
@@ -68,9 +67,9 @@ CREATE TYPE shared.outbox_status AS ENUM (
 );
 
 -- -----------------------------------------------------------------------------
--- 5. TABLA: outbox_events (Transactional Outbox)
+-- 5. TABLA: outbox_events (Transactional Outbox Transversal)
 -- -----------------------------------------------------------------------------
-CREATE TABLE public.outbox_events (
+CREATE TABLE shared.outbox_events (
     created_at     TIMESTAMPTZ          NOT NULL DEFAULT clock_timestamp(),
     next_retry_at  TIMESTAMPTZ,
     locked_at      TIMESTAMPTZ,
@@ -102,40 +101,40 @@ CREATE TABLE public.outbox_events (
 
 -- Índices operativos (SKIP LOCKED y reintentos)
 CREATE INDEX idx_outbox_events_pending
-    ON public.outbox_events (created_at ASC, event_id ASC)
+    ON shared.outbox_events (created_at ASC, event_id ASC)
     WHERE status = 'PENDING';
 
 CREATE INDEX idx_outbox_events_processing
-    ON public.outbox_events (status, created_at ASC)
+    ON shared.outbox_events (status, created_at ASC)
     WHERE status IN ('PENDING', 'PROCESSING');
 
 CREATE INDEX idx_outbox_events_retry
-    ON public.outbox_events (next_retry_at ASC, event_id ASC)
+    ON shared.outbox_events (next_retry_at ASC, event_id ASC)
     WHERE status = 'FAILED' AND next_retry_at IS NOT NULL;
 
 CREATE INDEX idx_outbox_events_stale_locks
-    ON public.outbox_events (locked_at ASC)
+    ON shared.outbox_events (locked_at ASC)
     WHERE status = 'PROCESSING';
 
 CREATE INDEX idx_outbox_events_purge
-    ON public.outbox_events (delivered_at ASC)
+    ON shared.outbox_events (delivered_at ASC)
     WHERE status = 'DELIVERED';
 
 CREATE INDEX idx_outbox_events_dlq
-    ON public.outbox_events (created_at DESC)
+    ON shared.outbox_events (created_at DESC)
     WHERE status = 'DEAD_LETTER';
 
 CREATE INDEX idx_outbox_events_aggregate
-    ON public.outbox_events (aggregate_id, created_at DESC);
+    ON shared.outbox_events (aggregate_id, created_at DESC);
 
 CREATE INDEX idx_outbox_events_tenant
-    ON public.outbox_events (tenant_id, created_at DESC)
+    ON shared.outbox_events (tenant_id, created_at DESC)
     WHERE tenant_id IS NOT NULL;
 
 -- -----------------------------------------------------------------------------
--- 6. TABLA: processed_events (Compuerta de Idempotencia)
+-- 6. TABLA: processed_events (Compuerta de Idempotencia Transversal)
 -- -----------------------------------------------------------------------------
-CREATE TABLE public.processed_events (
+CREATE TABLE shared.processed_events (
     processed_at  TIMESTAMPTZ  NOT NULL DEFAULT clock_timestamp(),
     event_id      UUID         NOT NULL,
     consumer_name VARCHAR(128) NOT NULL,
@@ -148,24 +147,72 @@ CREATE TABLE public.processed_events (
 
 -- Índices de consulta y purga TTL
 CREATE INDEX idx_processed_events_purge
-    ON public.processed_events (processed_at ASC);
+    ON shared.processed_events (processed_at ASC);
 
 CREATE INDEX idx_processed_events_consumer
-    ON public.processed_events (consumer_name, processed_at DESC);
+    ON shared.processed_events (consumer_name, processed_at DESC);
 
 -- -----------------------------------------------------------------------------
--- 7. PERMISOS
+-- 7. AUDIT LOG (Particionado Mensual Transversal)
 -- -----------------------------------------------------------------------------
+CREATE TABLE shared.audit_log (
+    occurred_at    TIMESTAMPTZ       NOT NULL DEFAULT clock_timestamp(),
+    actor_type     shared.actor_type NOT NULL,
+    id             UUID              NOT NULL,
+    actor_id       UUID              NOT NULL,
+    entity_id      UUID              NOT NULL,
+    tenant_id      UUID,
+    changes        JSONB             NOT NULL,
+    action         VARCHAR(64)       NOT NULL,
+    entity_name    VARCHAR(64)       NOT NULL,
+    ip_address     INET,
+    correlation_id VARCHAR(120),
+
+    CONSTRAINT pk_audit_log PRIMARY KEY (id, occurred_at),
+    CONSTRAINT chk_audit_log_changes_object CHECK (jsonb_typeof(changes) = 'object')
+) PARTITION BY RANGE (occurred_at);
+
+-- Partición por defecto
+CREATE TABLE shared.audit_log_default
+    PARTITION OF shared.audit_log DEFAULT;
+
+-- Particiones mensuales pre-aprovisionadas
+CREATE TABLE shared.audit_log_y2026m10 PARTITION OF shared.audit_log
+    FOR VALUES FROM ('2026-10-01 00:00:00+00') TO ('2026-11-01 00:00:00+00');
+CREATE TABLE shared.audit_log_y2026m11 PARTITION OF shared.audit_log
+    FOR VALUES FROM ('2026-11-01 00:00:00+00') TO ('2026-12-01 00:00:00+00');
+CREATE TABLE shared.audit_log_y2026m12 PARTITION OF shared.audit_log
+    FOR VALUES FROM ('2026-12-01 00:00:00+00') TO ('2027-01-01 00:00:00+00');
+CREATE TABLE shared.audit_log_y2027m01 PARTITION OF shared.audit_log
+    FOR VALUES FROM ('2027-01-01 00:00:00+00') TO ('2027-02-01 00:00:00+00');
+
+-- Índices de consulta de auditoría
+CREATE INDEX idx_shared_audit_tenant_lookup ON shared.audit_log (tenant_id, occurred_at DESC)
+    WHERE tenant_id IS NOT NULL;
+CREATE INDEX idx_shared_audit_entity_lookup ON shared.audit_log (entity_name, entity_id, occurred_at DESC);
+CREATE INDEX idx_shared_audit_actor_lookup ON shared.audit_log (actor_id, occurred_at DESC);
+
+-- -----------------------------------------------------------------------------
+-- 8. POLÍTICAS DE SEGURIDAD (RLS)
+-- -----------------------------------------------------------------------------
+ALTER TABLE shared.audit_log ENABLE ROW LEVEL SECURITY;
+ALTER TABLE shared.audit_log FORCE ROW LEVEL SECURITY;
+CREATE POLICY rls_shared_audit_log ON shared.audit_log
+    USING (tenant_id IS NOT DISTINCT FROM (SELECT nullif(current_setting('app.current_tenant_id', true), '')::uuid))
+    WITH CHECK (tenant_id IS NOT DISTINCT FROM (SELECT nullif(current_setting('app.current_tenant_id', true), '')::uuid));
+
+-- -----------------------------------------------------------------------------
+-- 9. PERMISOS E INMUTABILIDAD
+-- -----------------------------------------------------------------------------
+REVOKE UPDATE, DELETE, TRUNCATE ON shared.audit_log FROM PUBLIC;
+
 DO $$
 BEGIN
     IF EXISTS (SELECT FROM pg_roles WHERE rolname = 'template_app') THEN
         GRANT USAGE ON SCHEMA shared TO template_app;
         GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA shared TO template_app;
         ALTER DEFAULT PRIVILEGES IN SCHEMA shared GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO template_app;
-
-        GRANT USAGE ON SCHEMA public TO template_app;
-        GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.outbox_events TO template_app;
-        GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.processed_events TO template_app;
+        REVOKE UPDATE, DELETE, TRUNCATE ON shared.audit_log FROM template_app;
     END IF;
 END
 $$;
