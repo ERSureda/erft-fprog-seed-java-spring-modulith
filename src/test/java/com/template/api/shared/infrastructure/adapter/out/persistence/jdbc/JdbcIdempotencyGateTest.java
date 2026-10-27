@@ -12,6 +12,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
@@ -69,6 +70,28 @@ class JdbcIdempotencyGateTest {
     }
 
     @Test
+    @DisplayName("tryAcquire should fallback to default consumer when consumerName is blank or null")
+    void should_fallback_to_default_consumer_when_consumer_name_is_blank() {
+        UUID eventId = UUID.randomUUID();
+        when(jdbcTemplate.update(contains("INSERT INTO shared.processed_events"), eq(Map.of(
+                "eventId", eventId,
+                "consumerName", "default"
+        )))).thenReturn(1);
+
+        boolean acquired = idempotencyGate.tryAcquire("ordering", eventId, "  ");
+
+        assertThat(acquired).isTrue();
+    }
+
+    @Test
+    @DisplayName("tryAcquire should throw NullPointerException when eventId is null")
+    void should_throw_when_try_acquire_event_id_is_null() {
+        assertThatThrownBy(() -> idempotencyGate.tryAcquire("ordering", null, "OrderingWorker"))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessageContaining("eventId must not be null");
+    }
+
+    @Test
     @DisplayName("release should execute delete and return true when row removed")
     void should_return_true_when_release_deletes_row() {
         UUID eventId = UUID.randomUUID();
@@ -94,10 +117,31 @@ class JdbcIdempotencyGateTest {
     }
 
     @Test
-    @DisplayName("isProcessed should return true when count is positive")
-    void should_return_true_when_is_processed_count_is_positive() {
+    @DisplayName("release should execute delete for all consumers when consumerName is null")
+    void should_delete_all_consumers_when_release_consumer_name_is_null() {
         UUID eventId = UUID.randomUUID();
-        when(jdbcTemplate.queryForObject(contains("SELECT COUNT(*) FROM shared.processed_events"), anyMap(), eq(Integer.class))).thenReturn(1);
+
+        idempotencyGate.release("ordering", eventId, null);
+
+        verify(jdbcTemplate).update(
+                contains("DELETE FROM shared.processed_events WHERE event_id = :eventId"),
+                eq(Map.of("eventId", eventId))
+        );
+    }
+
+    @Test
+    @DisplayName("release should throw NullPointerException when eventId is null")
+    void should_throw_when_release_event_id_is_null() {
+        assertThatThrownBy(() -> idempotencyGate.release((UUID) null))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessageContaining("eventId must not be null");
+    }
+
+    @Test
+    @DisplayName("isProcessed should return true when event exists")
+    void should_return_true_when_is_processed_event_exists() {
+        UUID eventId = UUID.randomUUID();
+        when(jdbcTemplate.queryForObject(contains("EXISTS"), anyMap(), eq(Boolean.class))).thenReturn(Boolean.TRUE);
 
         boolean processed = idempotencyGate.isProcessed(eventId);
 
@@ -105,13 +149,32 @@ class JdbcIdempotencyGateTest {
     }
 
     @Test
-    @DisplayName("isProcessed with schema should return true when count is positive")
-    void should_return_true_when_is_processed_with_schema_count_is_positive() {
+    @DisplayName("isProcessed with schema should return true when event exists")
+    void should_return_true_when_is_processed_with_schema_event_exists() {
         UUID eventId = UUID.randomUUID();
-        when(jdbcTemplate.queryForObject(contains("SELECT COUNT(*) FROM shared.processed_events"), eq(Map.of("eventId", eventId)), eq(Integer.class))).thenReturn(1);
+        when(jdbcTemplate.queryForObject(contains("EXISTS"), eq(Map.of("eventId", eventId)), eq(Boolean.class))).thenReturn(Boolean.TRUE);
 
         boolean processed = idempotencyGate.isProcessed("ordering", eventId);
 
         assertThat(processed).isTrue();
+    }
+
+    @Test
+    @DisplayName("isProcessed should return false when event does not exist")
+    void should_return_false_when_is_processed_event_not_exists() {
+        UUID eventId = UUID.randomUUID();
+        when(jdbcTemplate.queryForObject(contains("EXISTS"), eq(Map.of("eventId", eventId)), eq(Boolean.class))).thenReturn(Boolean.FALSE);
+
+        boolean processed = idempotencyGate.isProcessed(eventId);
+
+        assertThat(processed).isFalse();
+    }
+
+    @Test
+    @DisplayName("isProcessed should throw NullPointerException when eventId is null")
+    void should_throw_when_is_processed_event_id_is_null() {
+        assertThatThrownBy(() -> idempotencyGate.isProcessed(null))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessageContaining("eventId must not be null");
     }
 }

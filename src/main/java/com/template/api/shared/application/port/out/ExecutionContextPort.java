@@ -7,6 +7,5 @@ import java.util.Optional;
 public interface ExecutionContextPort {
 
     ExecutionContext current();
-
     Optional<ExecutionContext> findCurrent();
 }
