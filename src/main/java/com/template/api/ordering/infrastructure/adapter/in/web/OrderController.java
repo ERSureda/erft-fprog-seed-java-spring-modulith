@@ -33,7 +33,6 @@ public class OrderController {
     }
 
     @GetMapping("/{id}")
-    @ResponseStatus(HttpStatus.OK)
     public OrderResult getOrderById(@PathVariable UUID id) {
         return getOrderByIdUseCase.execute(new GetOrderByIdQuery(id));
     }

@@ -46,11 +46,7 @@ public class JdbcIdempotencyGate implements IdempotencyGate {
 
     @Override
     public boolean release(UUID eventId) {
-        return release(null, eventId);
-    }
-
-    public boolean release(String moduleSchema, UUID eventId) {
-        String tableName = resolveTable(moduleSchema);
+        String tableName = resolveTable(null);
         String sql = "DELETE FROM " + tableName + " WHERE event_id = :eventId";
         int rows = jdbcTemplate.update(sql, Map.of("eventId", eventId));
         return rows > 0;

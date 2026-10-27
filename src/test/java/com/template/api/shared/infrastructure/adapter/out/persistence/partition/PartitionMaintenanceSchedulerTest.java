@@ -26,7 +26,7 @@ class PartitionMaintenanceSchedulerTest {
 
     @Test
     @DisplayName("Should execute procedure call successfully")
-    void should_execute_procedure_call_successfully() {
+    void should_execute_procedure_call_successfully_when_scheduler_runs() {
         assertDoesNotThrow(() -> scheduler.maintainPartitions());
 
         verify(jdbcTemplate).execute(eq("CALL shared.sp_maintain_monthly_partitions(3, 1)"));

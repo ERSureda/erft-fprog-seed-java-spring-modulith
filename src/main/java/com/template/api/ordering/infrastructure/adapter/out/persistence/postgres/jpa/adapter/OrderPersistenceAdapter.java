@@ -23,7 +23,7 @@ public class OrderPersistenceAdapter implements OrderRepositoryPort {
 
     @Override
     public Optional<Order> findById(UUID id) {
-        return orderJpaRepository.findById(id).map(orderPersistenceMapper::toDomain);
+        return orderJpaRepository.findByIdAndDeletedAtIsNull(id).map(orderPersistenceMapper::toDomain);
     }
 
     @Override

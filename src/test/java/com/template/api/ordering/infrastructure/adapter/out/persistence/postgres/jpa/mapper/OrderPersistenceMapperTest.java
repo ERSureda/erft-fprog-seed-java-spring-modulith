@@ -85,4 +85,23 @@ class OrderPersistenceMapperTest {
         assertThat(mapper.toEntity(null)).isNull();
         assertThat(mapper.toDomain(null)).isNull();
     }
+
+    @Test
+    @DisplayName("should_return_null_when_entity_is_soft_deleted")
+    void should_return_null_when_entity_is_soft_deleted() {
+        OrderEntity entity = new OrderEntity(
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                new BigDecimal("99.99"),
+                "EUR",
+                "CONFIRMED",
+                1L,
+                Instant.now(),
+                Instant.now(),
+                Instant.now()
+        );
+
+        assertThat(mapper.toDomain(entity)).isNull();
+    }
 }

@@ -60,7 +60,7 @@ class CreateOrderServiceTest {
         when(uuidGeneratorPort.generateId()).thenReturn(generatedOrderId);
         when(utcClockPort.now()).thenReturn(fixedNow);
 
-        CreateOrderCommand command = new CreateOrderCommand(new BigDecimal("150.00"), "EUR");
+        CreateOrderCommand command = new CreateOrderCommand(null, new BigDecimal("150.00"), "EUR");
         when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> {
             Order saved = invocation.getArgument(0);
             assertThat(saved.getTenantId()).isEqualTo(tenantId);
@@ -123,7 +123,7 @@ class CreateOrderServiceTest {
         when(uuidGeneratorPort.generateId()).thenReturn(generatedCustomerId, generatedOrderId);
         when(utcClockPort.now()).thenReturn(fixedNow);
 
-        CreateOrderCommand command = new CreateOrderCommand(new BigDecimal("99.00"), "EUR");
+        CreateOrderCommand command = new CreateOrderCommand(null, new BigDecimal("99.00"), "EUR");
         when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> {
             Order saved = invocation.getArgument(0);
             assertThat(saved.getTenantId()).isEqualTo(tenantId);
@@ -142,7 +142,7 @@ class CreateOrderServiceTest {
     @DisplayName("should_throw_forbidden_exception_when_context_is_null")
     void should_throw_forbidden_exception_when_context_is_null() {
         when(executionContextPort.current()).thenReturn(null);
-        CreateOrderCommand command = new CreateOrderCommand(new BigDecimal("100.00"), "EUR");
+        CreateOrderCommand command = new CreateOrderCommand(null, new BigDecimal("100.00"), "EUR");
 
         assertThatThrownBy(() -> createOrderService.execute(command))
                 .isInstanceOf(ForbiddenException.class)
@@ -153,7 +153,7 @@ class CreateOrderServiceTest {
     @DisplayName("should_throw_forbidden_exception_when_context_has_no_tenant")
     void should_throw_forbidden_exception_when_context_has_no_tenant() {
         when(executionContextPort.current()).thenReturn(ExecutionContext.anonymous());
-        CreateOrderCommand command = new CreateOrderCommand(new BigDecimal("100.00"), "EUR");
+        CreateOrderCommand command = new CreateOrderCommand(null, new BigDecimal("100.00"), "EUR");
 
         assertThatThrownBy(() -> createOrderService.execute(command))
                 .isInstanceOf(ForbiddenException.class)
@@ -168,7 +168,7 @@ class CreateOrderServiceTest {
                 new ExecutionContext(tenantId, UUID.randomUUID(), Set.of("USER"))
         );
 
-        CreateOrderCommand command = new CreateOrderCommand(new BigDecimal("50.00"), "INVALID_CURRENCY");
+        CreateOrderCommand command = new CreateOrderCommand(null, new BigDecimal("50.00"), "INVALID_CURRENCY");
 
         assertThatThrownBy(() -> createOrderService.execute(command))
                 .isInstanceOf(ValidationException.class)

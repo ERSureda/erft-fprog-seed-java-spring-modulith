@@ -38,7 +38,7 @@ public class OrderPersistenceMapper {
     }
 
     public Order toDomain(OrderEntity entity) {
-        if (entity == null) {
+        if (entity == null || entity.getDeletedAt() != null) {
             return null;
         }
 

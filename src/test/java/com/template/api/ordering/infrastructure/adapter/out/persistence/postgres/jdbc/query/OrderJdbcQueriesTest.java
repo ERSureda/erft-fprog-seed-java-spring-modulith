@@ -17,6 +17,7 @@ class OrderJdbcQueriesTest {
                 .isNotBlank()
                 .contains("SELECT id, status, amount, currency")
                 .contains("FROM ordering.orders")
-                .contains("WHERE id = :id");
+                .contains("WHERE id = :id")
+                .contains("AND deleted_at IS NULL");
     }
 }

@@ -8,5 +8,6 @@ public final class OrderJdbcQueries {
         SELECT id, status, amount, currency
         FROM ordering.orders
         WHERE id = :id
+          AND deleted_at IS NULL
         """;
 }
